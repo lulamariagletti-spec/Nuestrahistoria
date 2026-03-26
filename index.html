@@ -1051,6 +1051,7 @@
     };
     const UNIVERSES_STORAGE_KEY = 'universes_map_v1';
     const VIDEOS_STORAGE_KEY = 'videos_collection_v1';
+    const COLLECTION_MODEL_STORAGE_KEY = 'collection_model_v1';
     const BLOCKED_CHARACTERS_STORAGE_KEY = 'blocked_characters_by_actor_v1';
     const CLOUD_STORAGE_PATH = 'univoicerData/main';
     const MAX_LOCAL_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -1058,6 +1059,12 @@
     const NODE_HALF_HEIGHT = 93;
     let firebaseDb = null;
     let cloudSyncTimer = null;
+    let collectionModel = {
+      actors: [],
+      characters: [],
+      universes: [],
+      videos: []
+    };
 
     const appLayout = document.getElementById('appLayout');
     const toggleSidebar = document.getElementById('toggleSidebar');
@@ -1105,6 +1112,170 @@
         });
         return acc;
       }, {});
+    }
+
+    function normalizeEntityName(name) {
+      return String(name || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function createModelId(prefix, value) {
+      const base = cssSafe(String(value || '').trim() || `${prefix}-${Date.now()}`);
+      return `${prefix}-${base || Date.now()}`;
+    }
+
+    function createEmptyCollectionModel() {
+      return {
+        actors: [],
+        characters: [],
+        universes: [],
+        videos: []
+      };
+    }
+
+    function parseModelFromStorage(rawModel) {
+      if (!rawModel || typeof rawModel !== 'object') return null;
+      if (!Array.isArray(rawModel.actors) || !Array.isArray(rawModel.characters) || !Array.isArray(rawModel.universes) || !Array.isArray(rawModel.videos)) {
+        return null;
+      }
+      return {
+        actors: rawModel.actors.filter(Boolean).map(item => ({
+          id: String(item.id || ''),
+          name: String(item.name || 'Sin actor'),
+          characterIds: Array.isArray(item.characterIds) ? [...new Set(item.characterIds.filter(Boolean).map(String))] : []
+        })),
+        characters: rawModel.characters.filter(Boolean).map(item => ({
+          id: String(item.id || ''),
+          name: String(item.name || 'Sin personaje'),
+          actorIds: Array.isArray(item.actorIds) ? [...new Set(item.actorIds.filter(Boolean).map(String))] : [],
+          universeIds: Array.isArray(item.universeIds) ? [...new Set(item.universeIds.filter(Boolean).map(String))] : [],
+          videoIds: Array.isArray(item.videoIds) ? [...new Set(item.videoIds.filter(Boolean).map(String))] : [],
+          unlocked: Boolean(item.unlocked)
+        })),
+        universes: rawModel.universes.filter(Boolean).map(item => ({
+          id: String(item.id || ''),
+          name: String(item.name || 'Sin universo'),
+          characterIds: Array.isArray(item.characterIds) ? [...new Set(item.characterIds.filter(Boolean).map(String))] : []
+        })),
+        videos: rawModel.videos.filter(Boolean).map(item => ({
+          id: String(item.id || ''),
+          youtubeUrl: String(item.youtubeUrl || ''),
+          title: String(item.title || ''),
+          thumbnail: String(item.thumbnail || ''),
+          characterId: String(item.characterId || ''),
+          actorId: String(item.actorId || ''),
+          universeIds: Array.isArray(item.universeIds) ? [...new Set(item.universeIds.filter(Boolean).map(String))] : []
+        }))
+      };
+    }
+
+    function saveCollectionModel() {
+      localStorage.setItem(COLLECTION_MODEL_STORAGE_KEY, JSON.stringify(collectionModel));
+      scheduleCloudSync();
+    }
+
+    function loadCollectionModelFromStorage() {
+      try {
+        const raw = localStorage.getItem(COLLECTION_MODEL_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parseModelFromStorage(parsed);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function getOrCreateActor(model, actorName, actorMap) {
+      const normalized = normalizeEntityName(actorName || 'Sin actor');
+      if (actorMap.has(normalized)) return actorMap.get(normalized);
+      const actor = { id: createModelId('actor', normalized), name: (actorName || 'Sin actor').trim() || 'Sin actor', characterIds: [] };
+      model.actors.push(actor);
+      actorMap.set(normalized, actor);
+      return actor;
+    }
+
+    function getOrCreateCharacter(model, characterName, characterMap) {
+      const normalized = normalizeEntityName(characterName || 'Sin personaje');
+      if (characterMap.has(normalized)) return characterMap.get(normalized);
+      const character = { id: createModelId('character', normalized), name: (characterName || 'Sin personaje').trim() || 'Sin personaje', actorIds: [], universeIds: [], videoIds: [], unlocked: false };
+      model.characters.push(character);
+      characterMap.set(normalized, character);
+      return character;
+    }
+
+    function getOrCreateUniverse(model, universeName, universeMap) {
+      const normalized = normalizeEntityName(universeName || 'Sin universo');
+      if (universeMap.has(normalized)) return universeMap.get(normalized);
+      const universe = { id: createModelId('universe', normalized), name: (universeName || 'Sin universo').trim() || 'Sin universo', characterIds: [] };
+      model.universes.push(universe);
+      universeMap.set(normalized, universe);
+      return universe;
+    }
+
+    function linkActorCharacter(actorId, characterId, model = collectionModel) {
+      const actor = model.actors.find(item => item.id === actorId);
+      const character = model.characters.find(item => item.id === characterId);
+      if (!actor || !character) return;
+      if (!actor.characterIds.includes(characterId)) actor.characterIds.push(characterId);
+      if (!character.actorIds.includes(actorId)) character.actorIds.push(actorId);
+    }
+
+    function linkCharacterUniverse(characterId, universeId, model = collectionModel) {
+      const character = model.characters.find(item => item.id === characterId);
+      const universe = model.universes.find(item => item.id === universeId);
+      if (!character || !universe) return;
+      if (!character.universeIds.includes(universeId)) character.universeIds.push(universeId);
+      if (!universe.characterIds.includes(characterId)) universe.characterIds.push(characterId);
+    }
+
+    function addVideoAndUnlockCharacter(videoPayload, model = collectionModel) {
+      const video = {
+        id: String(videoPayload.id || `video-${Date.now()}`),
+        youtubeUrl: String(videoPayload.youtubeUrl || ''),
+        title: String(videoPayload.title || ''),
+        thumbnail: String(videoPayload.thumbnail || ''),
+        characterId: String(videoPayload.characterId || ''),
+        actorId: String(videoPayload.actorId || ''),
+        universeIds: Array.isArray(videoPayload.universeIds) ? [...new Set(videoPayload.universeIds.filter(Boolean).map(String))] : []
+      };
+      model.videos.push(video);
+      const character = model.characters.find(item => item.id === video.characterId);
+      if (character) {
+        if (!character.videoIds.includes(video.id)) character.videoIds.push(video.id);
+        character.unlocked = true;
+      }
+      return video;
+    }
+
+    function migrateLegacyVideosToModel(legacyVideos) {
+      const model = createEmptyCollectionModel();
+      const actorMap = new Map();
+      const characterMap = new Map();
+      const universeMap = new Map();
+
+      (legacyVideos || []).forEach((video, idx) => {
+        const actor = getOrCreateActor(model, video?.actor_de_doblaje || 'Sin actor', actorMap);
+        const character = getOrCreateCharacter(model, video?.personaje || 'Sin personaje', characterMap);
+        linkActorCharacter(actor.id, character.id, model);
+        const universeIds = getVideoUniverses(video).filter(Boolean).map((universeName) => {
+          const universe = getOrCreateUniverse(model, universeName, universeMap);
+          linkCharacterUniverse(character.id, universe.id, model);
+          return universe.id;
+        });
+        addVideoAndUnlockCharacter({
+          id: video?.id || `video-legacy-${idx + 1}`,
+          youtubeUrl: video?.url_youtube || video?.url_video || '',
+          title: video?.titulo || '',
+          thumbnail: video?.thumbnail || '',
+          characterId: character.id,
+          actorId: actor.id,
+          universeIds
+        }, model);
+      });
+      return model;
     }
 
     function normalizeUniverseName(name) {
@@ -1174,6 +1345,13 @@
     }
 
     function getCharactersByActor(actorName) {
+      const normalizedActor = normalizeEntityName(actorName);
+      const modelActor = collectionModel.actors.find(item => normalizeEntityName(item.name) === normalizedActor);
+      if (modelActor) {
+        return modelActor.characterIds
+          .map((characterId) => collectionModel.characters.find(character => character.id === characterId)?.name)
+          .filter(Boolean);
+      }
       return [...new Set(
         VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === actorName)
           .map(v => v.personaje || 'Sin personaje')
@@ -1214,6 +1392,8 @@
 
     function saveVideos() {
       localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
+      collectionModel = migrateLegacyVideosToModel(VIDEOS);
+      saveCollectionModel();
       scheduleCloudSync();
     }
 
@@ -1227,6 +1407,16 @@
       } catch (_) {
         VIDEOS.splice(0, VIDEOS.length);
       }
+    }
+
+    function hydrateModelWithFallback() {
+      const storedModel = loadCollectionModelFromStorage();
+      if (storedModel) {
+        collectionModel = storedModel;
+        return;
+      }
+      collectionModel = migrateLegacyVideosToModel(VIDEOS);
+      saveCollectionModel();
     }
 
     function initFirebase() {
@@ -1251,9 +1441,20 @@
           VIDEOS.splice(0, VIDEOS.length, ...data.videos.filter(video => video && typeof video === 'object'));
           localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
         }
+        if (data.collectionModel && typeof data.collectionModel === 'object') {
+          const parsedModel = parseModelFromStorage(data.collectionModel);
+          if (parsedModel) {
+            collectionModel = parsedModel;
+            localStorage.setItem(COLLECTION_MODEL_STORAGE_KEY, JSON.stringify(collectionModel));
+          }
+        }
         if (data.blockedCharactersByActor && typeof data.blockedCharactersByActor === 'object') {
           state.blockedCharactersByActor = data.blockedCharactersByActor;
           localStorage.setItem(BLOCKED_CHARACTERS_STORAGE_KEY, JSON.stringify(state.blockedCharactersByActor));
+        }
+        if (!collectionModel.videos.length && VIDEOS.length) {
+          collectionModel = migrateLegacyVideosToModel(VIDEOS);
+          localStorage.setItem(COLLECTION_MODEL_STORAGE_KEY, JSON.stringify(collectionModel));
         }
       } catch (err) {
         console.warn('No se pudo leer Firebase, usando almacenamiento local.', err);
@@ -1269,6 +1470,7 @@
             updatedAt: Date.now(),
             universeNodes: state.universeNodes,
             videos: VIDEOS,
+            collectionModel,
             blockedCharactersByActor: state.blockedCharactersByActor
           });
         } catch (err) {
@@ -1682,8 +1884,8 @@
     function renderInicioView() {
       const universeMap = groupByUniverse();
       const totalUniverses = Object.keys(universeMap).length;
-      const totalVideos = VIDEOS.length;
-      const totalCharacters = new Set(
+      const totalVideos = collectionModel.videos.length || VIDEOS.length;
+      const totalCharacters = collectionModel.characters.length || new Set(
         VIDEOS.map(video => (video.personaje || '').trim()).filter(Boolean)
       ).size;
       const latestFromVideos = VIDEOS.slice(-6).reverse();
@@ -2205,7 +2407,10 @@
     }
 
     function renderActoresView() {
-      const actors = [...new Set(VIDEOS.map(v => v.actor_de_doblaje).filter(Boolean))].sort();
+      const actors = (collectionModel.actors.length
+        ? collectionModel.actors.map(item => item.name)
+        : [...new Set(VIDEOS.map(v => v.actor_de_doblaje).filter(Boolean))]
+      ).sort();
       const actor = state.actorFocus || actors[0] || null;
       const actorVideos = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === actor);
       const actorCharacters = [...new Set(actorVideos.map(v => v.personaje || 'Sin personaje'))];
@@ -2454,11 +2659,13 @@
 
     state.universeNodes = loadUniverseNodesFromStorage();
     loadVideosFromStorage();
+    hydrateModelWithFallback();
     state.blockedCharactersByActor = loadBlockedCharactersFromStorage();
 
     (async () => {
       initFirebase();
       await loadFromFirebase();
+      hydrateModelWithFallback();
       changeView('map');
     })();
   </script>
