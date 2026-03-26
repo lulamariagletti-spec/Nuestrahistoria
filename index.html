@@ -736,6 +736,91 @@
       background: rgba(8, 19, 38, .82);
     }
 
+    .holo-card {
+      border: 1px solid rgba(130, 196, 255, .4);
+      background:
+        linear-gradient(160deg, rgba(11, 23, 48, .88), rgba(15, 20, 42, .76)),
+        rgba(8, 16, 32, .72);
+      backdrop-filter: blur(12px);
+      box-shadow:
+        0 0 0 1px rgba(84, 184, 255, .22),
+        0 14px 34px rgba(5, 10, 24, .65),
+        0 0 28px rgba(73, 183, 255, .22);
+    }
+
+    .detail-character {
+      color: #f5faff;
+      font-size: clamp(1.45rem, 1.2rem + .8vw, 2.1rem);
+      text-shadow: 0 0 20px rgba(90, 214, 255, .45);
+    }
+
+    .detail-meta {
+      margin: 0;
+      color: #c7ddff;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .detail-meta strong {
+      color: #ecf7ff;
+    }
+
+    .video-preview {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(110, 195, 255, .5);
+      background: rgba(5, 12, 26, .9);
+      box-shadow: 0 0 24px rgba(80, 196, 255, .26);
+      margin-top: 12px;
+    }
+
+    .video-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: saturate(1.08) contrast(1.06);
+    }
+
+    .video-preview .preview-overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(18, 38, 69, .16), rgba(6, 12, 24, .72)),
+        linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(4, 8, 18, .8) 100%);
+    }
+
+    .play-btn {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      border: 1px solid rgba(130, 220, 255, .85);
+      background: linear-gradient(145deg, rgba(23, 116, 210, .72), rgba(89, 53, 255, .52));
+      box-shadow: 0 0 24px rgba(99, 206, 255, .5);
+      color: #fff;
+      font-size: 1.7rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .play-btn:hover {
+      box-shadow: 0 0 34px rgba(99, 206, 255, .72), 0 0 16px rgba(140, 104, 255, .45);
+    }
+
+    .section-note {
+      margin: 6px 0 0;
+      color: #9cbce4;
+      font-size: .9rem;
+    }
+
     iframe { width: 100%; aspect-ratio: 16/9; border: 0; display: block; }
 
     .index-list { display: grid; gap: 8px; max-height: 460px; overflow: auto; }
@@ -815,7 +900,7 @@
       padding-left: 18px;
       display: grid;
       gap: 4px;
-      color: #a9c9e3;
+      color: #d5ecff;
     }
     .detail-close {
       justify-self: end;
@@ -961,10 +1046,12 @@
       showAddForm: false,
       marathon: { active: false, queue: [], position: 0 },
       universeNodes: [],
-      mapCanvas: { width: 1400, height: 900 }
+      mapCanvas: { width: 1400, height: 900 },
+      blockedCharactersByActor: {}
     };
     const UNIVERSES_STORAGE_KEY = 'universes_map_v1';
     const VIDEOS_STORAGE_KEY = 'videos_collection_v1';
+    const BLOCKED_CHARACTERS_STORAGE_KEY = 'blocked_characters_by_actor_v1';
     const CLOUD_STORAGE_PATH = 'univoicerData/main';
     const MAX_LOCAL_IMAGE_BYTES = 2 * 1024 * 1024;
     const NODE_HALF_WIDTH = 110;
@@ -1060,6 +1147,49 @@
       scheduleCloudSync();
     }
 
+    function saveBlockedCharacters() {
+      localStorage.setItem(BLOCKED_CHARACTERS_STORAGE_KEY, JSON.stringify(state.blockedCharactersByActor));
+      scheduleCloudSync();
+    }
+
+    function loadBlockedCharactersFromStorage() {
+      try {
+        const raw = localStorage.getItem(BLOCKED_CHARACTERS_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return {};
+        return Object.entries(parsed).reduce((acc, [actor, list]) => {
+          if (!actor?.trim()) return acc;
+          acc[actor] = Array.isArray(list) ? [...new Set(list.map(item => String(item || '').trim()).filter(Boolean))] : [];
+          return acc;
+        }, {});
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function getVideoThumbnail(video) {
+      if (video?.thumbnail) return video.thumbnail;
+      return getUniverseCover([video]);
+    }
+
+    function getCharactersByActor(actorName) {
+      return [...new Set(
+        VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === actorName)
+          .map(v => v.personaje || 'Sin personaje')
+          .filter(Boolean)
+      )];
+    }
+
+    function unlockBlockedCharacterForActor(actorName, characterName) {
+      if (!actorName || !characterName) return;
+      const blocked = state.blockedCharactersByActor[actorName] || [];
+      const filtered = blocked.filter(item => item !== characterName);
+      if (filtered.length) state.blockedCharactersByActor[actorName] = filtered;
+      else delete state.blockedCharactersByActor[actorName];
+      saveBlockedCharacters();
+    }
+
     function loadUniverseNodesFromStorage() {
       try {
         const raw = localStorage.getItem(UNIVERSES_STORAGE_KEY);
@@ -1121,6 +1251,10 @@
           VIDEOS.splice(0, VIDEOS.length, ...data.videos.filter(video => video && typeof video === 'object'));
           localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
         }
+        if (data.blockedCharactersByActor && typeof data.blockedCharactersByActor === 'object') {
+          state.blockedCharactersByActor = data.blockedCharactersByActor;
+          localStorage.setItem(BLOCKED_CHARACTERS_STORAGE_KEY, JSON.stringify(state.blockedCharactersByActor));
+        }
       } catch (err) {
         console.warn('No se pudo leer Firebase, usando almacenamiento local.', err);
       }
@@ -1134,7 +1268,8 @@
           await firebaseDb.ref(CLOUD_STORAGE_PATH).set({
             updatedAt: Date.now(),
             universeNodes: state.universeNodes,
-            videos: VIDEOS
+            videos: VIDEOS,
+            blockedCharactersByActor: state.blockedCharactersByActor
           });
         } catch (err) {
           console.warn('No se pudo guardar en Firebase.', err);
@@ -1777,6 +1912,7 @@
           rareza: String(formData.get('rareza') || 'Común')
         };
         VIDEOS.push(newVideo);
+        unlockBlockedCharacterForActor(newVideo.actor_de_doblaje, newVideo.personaje);
         saveVideos();
         state.showAddForm = false;
         state.selectedVideoId = newVideo.id;
@@ -1822,19 +1958,24 @@
         <article class="detail-content">
           <button class="detail-close neon-btn" id="closeDetail">✕ Cerrar</button>
           <div class="detail-grid">
-            <section class="hud-panel">
-              <h3 class="section-title">${personaje}</h3>
-              <p><strong>Actor de doblaje:</strong> <button class="detail-actor-link" data-open-actor="${actor}">${actor}</button></p>
+            <section class="hud-panel holo-card">
+              <h3 class="section-title detail-character">${personaje}</h3>
+              <p class="detail-meta"><strong>Actor de doblaje:</strong> <button class="detail-actor-link" data-open-actor="${actor}">${actor}</button></p>
               <span class="badge ${rarityClass(video.rareza || 'Común')}">${video.rareza || 'Común'}</span>
-              <div class="player-box" style="margin-top:10px;">
-                <iframe src="${toEmbedUrl(video.url_youtube || video.url_video, 1)}" title="Video detallado" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+              <div class="video-preview" data-video-preview>
+                <img src="${getVideoThumbnail(video)}" alt="Miniatura del video de ${personaje}">
+                <div class="preview-overlay">
+                  <button class="play-btn" id="playVideoPreview" aria-label="Reproducir video">▶</button>
+                </div>
               </div>
+              <p class="section-note">El video inicia solo cuando haces click en play.</p>
               <div class="actions">
+                <button id="openCharacterProfile" class="neon-btn">Ver perfil del personaje</button>
                 <button id="editVideo" class="neon-btn">Editar personaje/video</button>
                 <button id="deleteVideo" class="neon-btn">Eliminar personaje/video</button>
               </div>
             </section>
-            <aside class="hud-panel">
+            <aside class="hud-panel holo-card">
               <h4 class="section-title">Universos relacionados</h4>
               <ul class="detail-list terminal-list">${universosRelacionados.map(u => `<li>${u}</li>`).join('') || '<li>Sin datos</li>'}</ul>
               <h4 class="section-title">Saludos del actor</h4>
@@ -1848,6 +1989,15 @@
       });
       document.body.appendChild(modal);
       modal.querySelector('#closeDetail')?.addEventListener('click', () => modal.remove());
+      modal.querySelector('#playVideoPreview')?.addEventListener('click', () => {
+        const target = modal.querySelector('[data-video-preview]');
+        if (!target) return;
+        target.innerHTML = `<iframe src="${toEmbedUrl(video.url_youtube || video.url_video, 1)}" title="Video detallado" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+      });
+      modal.querySelector('#openCharacterProfile')?.addEventListener('click', () => {
+        modal.remove();
+        openCharacterProfile(personaje);
+      });
       modal.querySelector('[data-open-actor]')?.addEventListener('click', (event) => {
         const actorName = event.currentTarget.dataset.openActor;
         if (!actorName) return;
@@ -1868,7 +2018,9 @@
         video.actor_de_doblaje = actorNuevo.trim() || 'Sin actor';
         video.rareza = rarezasPermitidas(rarezaNueva);
         video.universo = universosNuevos.split(',').map(u => u.trim()).filter(Boolean);
+        unlockBlockedCharacterForActor(video.actor_de_doblaje, video.personaje);
         ensureUniverseNodes();
+        saveVideos();
         renderMapView();
         renderUniverseView();
         modal.remove();
@@ -1877,9 +2029,84 @@
         if (!confirm('¿Eliminar este personaje/video de la colección?')) return;
         const index = VIDEOS.findIndex(item => item.id === video.id);
         if (index >= 0) VIDEOS.splice(index, 1);
+        saveVideos();
         renderMapView();
         renderUniverseView();
         modal.remove();
+      });
+    }
+
+    function openCharacterProfile(characterName) {
+      const videosByCharacter = VIDEOS.filter(v => (v.personaje || 'Sin personaje') === characterName);
+      const universes = [...new Set(videosByCharacter.flatMap(v => getVideoUniverses(v)).filter(Boolean))];
+      const actors = [...new Set(videosByCharacter.map(v => v.actor_de_doblaje || 'Sin actor').filter(Boolean))];
+
+      const modal = document.createElement('section');
+      modal.className = 'detail-modal';
+      modal.innerHTML = `
+        <article class="detail-content">
+          <button class="detail-close neon-btn" id="closeCharacterProfile">✕ Cerrar</button>
+          <section class="hud-panel holo-card">
+            <h3 class="section-title detail-character">${characterName}</h3>
+            <p class="section-subtitle">Perfil del personaje con universos y actores asociados.</p>
+            <div class="detail-grid">
+              <article>
+                <h4 class="section-title">Universos</h4>
+                <ul id="characterUniverseList" class="detail-list terminal-list">
+                  ${universes.map(name => `<li>${name}</li>`).join('') || '<li>Sin universos</li>'}
+                </ul>
+                <div class="actions">
+                  <input id="characterUniverseInput" type="text" placeholder="Agregar universo al personaje">
+                  <button id="addCharacterUniverse" class="neon-btn">Agregar universo</button>
+                </div>
+              </article>
+              <article>
+                <h4 class="section-title">Actores de doblaje asociados</h4>
+                <ul class="detail-list terminal-list">
+                  ${actors.map(name => `<li>${name}</li>`).join('') || '<li>Sin actores</li>'}
+                </ul>
+              </article>
+            </div>
+          </section>
+        </article>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) modal.remove();
+      });
+      modal.querySelector('#closeCharacterProfile')?.addEventListener('click', () => modal.remove());
+      modal.querySelector('#addCharacterUniverse')?.addEventListener('click', () => {
+        const input = modal.querySelector('#characterUniverseInput');
+        const newUniverse = String(input?.value || '').trim();
+        if (!newUniverse) return;
+        const existing = new Set(universes.map(item => item.toLowerCase()));
+        if (existing.has(newUniverse.toLowerCase())) {
+          input.value = '';
+          return;
+        }
+        videosByCharacter.forEach(item => {
+          const set = new Set(getVideoUniverses(item));
+          set.add(newUniverse);
+          item.universo = [...set];
+        });
+        if (!videosByCharacter.length) {
+          VIDEOS.push({
+            id: `video-${Date.now()}`,
+            titulo: `Nuevo registro de ${characterName}`,
+            universo: [newUniverse],
+            personaje: characterName,
+            actor_de_doblaje: 'Sin actor',
+            url_youtube: '',
+            rareza: 'Común',
+            thumbnail: createPlaceholderCover(newUniverse)
+          });
+        }
+        ensureUniverseNodes();
+        saveVideos();
+        renderMapView();
+        renderUniverseView();
+        modal.remove();
+        openCharacterProfile(characterName);
       });
     }
 
@@ -1982,8 +2209,10 @@
       const actor = state.actorFocus || actors[0] || null;
       const actorVideos = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === actor);
       const actorCharacters = [...new Set(actorVideos.map(v => v.personaje || 'Sin personaje'))];
+      const blockedCharacters = state.blockedCharactersByActor[actor] || [];
+      const blockedOnly = blockedCharacters.filter(name => !actorCharacters.includes(name));
       viewActores.innerHTML = `
-        <section class="mock-shell">
+        <section class="mock-shell holo-card">
           <h2>Colección del actor</h2>
           <label>Seleccionar actor
             <select id="actorPicker">
@@ -1997,12 +2226,17 @@
             </article>
             <div class="mock-row">
               <article class="mock-box">
-                <h3>Personajes</h3>
-                <ul>${actorCharacters.map(name => `<li>${name}</li>`).join('') || '<li>Sin personajes.</li>'}</ul>
+                <h3>Personajes con saludo</h3>
+                <ul>${actorCharacters.map(name => `<li>${name}</li>`).join('') || '<li>Sin personajes con saludo.</li>'}</ul>
               </article>
               <article class="mock-box">
-                <h3>Videos</h3>
-                <ul>${actorVideos.map(item => `<li>${item.personaje || 'Sin personaje'} · ${item.titulo || 'Sin título'}</li>`).join('') || '<li>Sin videos.</li>'}</ul>
+                <h3>Personajes sin saludo (bloqueados)</h3>
+                <ul>${blockedOnly.map(item => `<li>${item}</li>`).join('') || '<li>Sin personajes bloqueados.</li>'}</ul>
+                <div class="actions">
+                  <input id="blockedCharacterInput" type="text" placeholder="Agregar personaje sin saludo">
+                  <button id="addBlockedCharacter" class="neon-btn">Agregar bloqueado</button>
+                </div>
+                <p class="section-note">Al agregar un video para este personaje, se desbloquea automáticamente.</p>
               </article>
             </div>
           ` : '<p class="muted">Sin actores registrados.</p>'}
@@ -2010,6 +2244,21 @@
       `;
       document.getElementById('actorPicker')?.addEventListener('change', (event) => {
         state.actorFocus = event.target.value;
+        renderActoresView();
+      });
+      document.getElementById('addBlockedCharacter')?.addEventListener('click', () => {
+        if (!actor) return;
+        const input = document.getElementById('blockedCharacterInput');
+        const characterName = String(input?.value || '').trim();
+        if (!characterName) return;
+        const withGreeting = getCharactersByActor(actor);
+        if (withGreeting.includes(characterName)) {
+          input.value = '';
+          return;
+        }
+        const current = state.blockedCharactersByActor[actor] || [];
+        state.blockedCharactersByActor[actor] = [...new Set([...current, characterName])];
+        saveBlockedCharacters();
         renderActoresView();
       });
     }
@@ -2205,6 +2454,7 @@
 
     state.universeNodes = loadUniverseNodesFromStorage();
     loadVideosFromStorage();
+    state.blockedCharactersByActor = loadBlockedCharactersFromStorage();
 
     (async () => {
       initFirebase();
