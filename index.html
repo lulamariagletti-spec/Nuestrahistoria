@@ -1398,63 +1398,6 @@
       )];
     }
 
-    function getNormalizedActorsData() {
-      const actorsMap = new Map();
-      const ensureActor = (actorName) => {
-        const cleanActor = String(actorName || '').trim();
-        if (!cleanActor) return null;
-        if (!actorsMap.has(cleanActor)) {
-          actorsMap.set(cleanActor, {
-            name: cleanActor,
-            characters: new Map()
-          });
-        }
-        return actorsMap.get(cleanActor);
-      };
-      const ensureCharacter = (actorEntry, characterName) => {
-        const cleanCharacter = String(characterName || '').trim();
-        if (!cleanCharacter) return null;
-        if (!actorEntry.characters.has(cleanCharacter)) {
-          actorEntry.characters.set(cleanCharacter, {
-            name: cleanCharacter,
-            unlocked: false,
-            videos: 0
-          });
-        }
-        return actorEntry.characters.get(cleanCharacter);
-      };
-
-      VIDEOS.forEach((video) => {
-        const actorEntry = ensureActor(video.actor_de_doblaje || 'Sin actor');
-        if (!actorEntry) return;
-        const characterEntry = ensureCharacter(actorEntry, video.personaje || 'Sin personaje');
-        if (!characterEntry) return;
-        characterEntry.unlocked = true;
-        characterEntry.videos += 1;
-      });
-
-      Object.entries(state.blockedCharactersByActor || {}).forEach(([actorName, characters]) => {
-        const actorEntry = ensureActor(actorName);
-        if (!actorEntry || !Array.isArray(characters)) return;
-        characters.forEach((characterName) => {
-          ensureCharacter(actorEntry, characterName);
-        });
-      });
-
-      const actors = [...actorsMap.values()]
-        .map((actorEntry) => {
-          const characterList = [...actorEntry.characters.values()]
-            .sort((a, b) => a.name.localeCompare(b.name));
-          return {
-            name: actorEntry.name,
-            characters: characterList
-          };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      return { actors };
-    }
-
     function unlockBlockedCharacterForActor(actorName, characterName) {
       if (!actorName || !characterName) return;
       const blocked = state.blockedCharactersByActor[actorName] || [];
@@ -2602,13 +2545,13 @@
           <h2>Colección del actor</h2>
           <label>Seleccionar actor
             <select id="actorPicker">
-              ${actors.map(item => `<option value="${item.name}" ${item.name === actor ? 'selected' : ''}>${item.name}</option>`).join('') || '<option>Sin actores</option>'}
+              ${actors.map(name => `<option value="${name}" ${name === actor ? 'selected' : ''}>${name}</option>`).join('') || '<option>Sin actores</option>'}
             </select>
           </label>
           ${actor ? `
             <article class="mock-box">
               <h3>${actor}</h3>
-              <p class="muted">Personajes: ${actorData?.characters.length || 0} · Videos: ${actorVideos}</p>
+              <p class="muted">Personajes: ${actorCharacters.length} · Videos: ${actorVideos.length}</p>
             </article>
             <div class="mock-row">
               <article class="mock-box">
@@ -2616,12 +2559,11 @@
                 <ul>${actorCharacters.map(name => `<li><button type="button" class="character-link" data-open-character="${name}">${name}</button></li>`).join('') || '<li>Sin personajes con saludo.</li>'}</ul>
               </article>
               <article class="mock-box">
-                <h3>Personajes bloqueados</h3>
-                <p class="section-note">Desbloqueados ${unlockedCharacters.length} / Bloqueados ${blockedCharacters.length}</p>
-                <ul>${blockedCharacters.map(item => `<li>${item.name}</li>`).join('') || '<li>Sin personajes bloqueados.</li>'}</ul>
+                <h3>Personajes sin saludo (bloqueados)</h3>
+                <ul>${blockedOnly.map(item => `<li>${item}</li>`).join('') || '<li>Sin personajes bloqueados.</li>'}</ul>
                 <div class="actions">
-                  <input id="blockedCharacterInput" type="text" placeholder="Nombre del personaje">
-                  <button id="addBlockedCharacter" class="neon-btn">Agregar personaje</button>
+                  <input id="blockedCharacterInput" type="text" placeholder="Agregar personaje sin saludo">
+                  <button id="addBlockedCharacter" class="neon-btn">Agregar bloqueado</button>
                 </div>
                 <p class="section-note">Al agregar un video para este personaje, se desbloquea automáticamente.</p>
               </article>
@@ -2638,9 +2580,8 @@
         const input = document.getElementById('blockedCharacterInput');
         const characterName = String(input?.value || '').trim();
         if (!characterName) return;
-        const actorState = getNormalizedActorsData().actors.find((item) => item.name === actor);
-        const alreadyLinked = actorState?.characters.some((item) => item.name === characterName);
-        if (alreadyLinked) {
+        const withGreeting = getCharactersByActor(actor);
+        if (withGreeting.includes(characterName)) {
           input.value = '';
           return;
         }
