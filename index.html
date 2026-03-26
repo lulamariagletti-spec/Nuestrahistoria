@@ -1248,19 +1248,9 @@
         </div>
         <button id="toggleSidebar" class="sidebar-toggle">↔️ Colapsar menú</button>
         <nav class="sidebar-nav">
-          <button id="navInicio" class="sidebar-item"><span class="sidebar-emoji">🏠</span><span class="sidebar-label">1. Inicio</span></button>
-          <button id="navUniverses" class="sidebar-item active"><span class="sidebar-emoji">🪐</span><span class="sidebar-label">2. Universos</span></button>
-          <button id="navCollection" class="sidebar-item"><span class="sidebar-emoji">🃏</span><span class="sidebar-label">3. Colección</span></button>
-          <button id="navIndice" class="sidebar-item"><span class="sidebar-emoji">📚</span><span class="sidebar-label">4. Índice</span></button>
-          <button id="navMaraton" class="sidebar-item"><span class="sidebar-emoji">🎬</span><span class="sidebar-label">5. Maratón</span></button>
-          <button id="navRarezas" class="sidebar-item"><span class="sidebar-emoji">💎</span><span class="sidebar-label">6. Rarezas</span></button>
-          <button id="navActores" class="sidebar-item"><span class="sidebar-emoji">🎙️</span><span class="sidebar-label">7. Actores</span></button>
-          <button id="navVersiones" class="sidebar-item"><span class="sidebar-emoji">🧬</span><span class="sidebar-label">8. Versiones</span></button>
-          <button id="navAchievements" class="sidebar-item"><span class="sidebar-emoji">🏆</span><span class="sidebar-label">9. Logros</span></button>
-          <button id="navFavoritos" class="sidebar-item"><span class="sidebar-emoji">⭐</span><span class="sidebar-label">10. Favoritos</span></button>
-          <button id="navBuscar" class="sidebar-item"><span class="sidebar-emoji">🔎</span><span class="sidebar-label">11. Buscar</span></button>
-          <button id="navStats" class="sidebar-item"><span class="sidebar-emoji">📈</span><span class="sidebar-label">12. Estadísticas</span></button>
-          <button id="navConfig" class="sidebar-item"><span class="sidebar-emoji">⚙️</span><span class="sidebar-label">13. Configuración</span></button>
+          <button id="navUniverses" class="sidebar-item active"><span class="sidebar-emoji">🪐</span><span class="sidebar-label">1. Universos</span></button>
+          <button id="navActores" class="sidebar-item"><span class="sidebar-emoji">🎙️</span><span class="sidebar-label">2. Actores</span></button>
+          <button id="navIndice" class="sidebar-item"><span class="sidebar-emoji">🎭</span><span class="sidebar-label">3. Personajes</span></button>
         </nav>
       </aside>
 
@@ -1332,19 +1322,9 @@
 
     const appLayout = document.getElementById('appLayout');
     const toggleSidebar = document.getElementById('toggleSidebar');
-    const navInicio = document.getElementById('navInicio');
     const navUniverses = document.getElementById('navUniverses');
-    const navCollection = document.getElementById('navCollection');
     const navIndice = document.getElementById('navIndice');
-    const navMaraton = document.getElementById('navMaraton');
-    const navRarezas = document.getElementById('navRarezas');
     const navActores = document.getElementById('navActores');
-    const navVersiones = document.getElementById('navVersiones');
-    const navAchievements = document.getElementById('navAchievements');
-    const navFavoritos = document.getElementById('navFavoritos');
-    const navBuscar = document.getElementById('navBuscar');
-    const navStats = document.getElementById('navStats');
-    const navConfig = document.getElementById('navConfig');
     const viewInicio = document.getElementById('viewInicio');
     const viewMap = document.getElementById('viewMap');
     const viewUniverse = document.getElementById('viewUniverse');
@@ -3172,21 +3152,11 @@
       viewCharacterProfile.classList.toggle('active', next === 'characterProfile');
       document.querySelectorAll('.sidebar-nav .sidebar-item').forEach(btn => btn.classList.remove('active'));
       const activeNavByView = {
-        inicio: navInicio,
         map: navUniverses,
         universe: navUniverses,
-        collection: navCollection,
+        characterProfile: navIndice,
         indice: navIndice,
-        maraton: navMaraton,
-        rarezas: navRarezas,
-        actores: navActores,
-        versiones: navVersiones,
-        achievements: navAchievements,
-        favoritos: navFavoritos,
-        buscar: navBuscar,
-        stats: navStats,
-        config: navConfig,
-        characterProfile: navUniverses
+        actores: navActores
       };
       activeNavByView[next]?.classList.add('active');
 
@@ -3212,19 +3182,9 @@
       toggleSidebar.textContent = appLayout.classList.contains('sidebar-collapsed') ? '➡️ Expandir menú' : '↔️ Colapsar menú';
     };
 
-    navInicio.onclick = () => changeView('inicio');
     navUniverses.onclick = () => changeView(state.universe ? 'universe' : 'map');
-    navCollection.onclick = () => changeView('collection');
     navIndice.onclick = () => changeView('indice');
-    navMaraton.onclick = () => changeView('maraton');
-    navRarezas.onclick = () => changeView('rarezas');
     navActores.onclick = () => changeView('actores');
-    navVersiones.onclick = () => changeView('versiones');
-    navAchievements.onclick = () => changeView('achievements');
-    navFavoritos.onclick = () => changeView('favoritos');
-    navBuscar.onclick = () => changeView('buscar');
-    navStats.onclick = () => changeView('stats');
-    navConfig.onclick = () => changeView('config');
 
     state.universeNodes = loadUniverseNodesFromStorage();
     loadVideosFromStorage();
