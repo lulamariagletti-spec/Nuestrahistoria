@@ -592,7 +592,7 @@
 
     .universe-gallery-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 260px;
+      grid-template-columns: minmax(0, 1fr);
       gap: 16px;
       align-items: start;
     }
@@ -617,6 +617,21 @@
       gap: 16px;
       align-items: stretch;
       margin-bottom: 14px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 14% 20%, rgba(87, 149, 255, .2), transparent 38%),
+        radial-gradient(circle at 86% 12%, rgba(138, 104, 255, .18), transparent 40%),
+        linear-gradient(150deg, rgba(10, 19, 40, .86), rgba(12, 22, 44, .78));
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow), 0 0 0 1px rgba(102, 205, 255, .22), 0 0 40px rgba(61, 152, 255, .2);
+    }
+    .universe-header::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, transparent 20%, rgba(138, 225, 255, .08) 50%, transparent 80%);
     }
 
     .universe-hero {
@@ -632,8 +647,14 @@
       object-fit: cover;
       border-radius: 14px;
       border: 1px solid var(--line);
-      box-shadow: var(--shadow-soft);
+      box-shadow: var(--shadow-soft), 0 0 22px rgba(60, 180, 255, .22);
       background: rgba(19, 28, 51, .8);
+      transition: transform .35s ease, box-shadow .35s ease, border-color .35s ease;
+    }
+    .universe-header:hover .universe-hero img {
+      transform: scale(1.03);
+      border-color: rgba(133, 222, 255, .66);
+      box-shadow: var(--shadow), 0 0 34px rgba(60, 180, 255, .28);
     }
 
     .universe-controls {
@@ -642,12 +663,53 @@
       align-content: start;
       justify-items: end;
     }
+    .universe-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .icon-btn span {
+      display: inline-flex;
+      transform: translateY(-1px);
+    }
 
     .filter-sidebar {
-      position: sticky;
-      top: 8px;
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      width: min(360px, calc(100vw - 36px));
       display: grid;
       gap: 10px;
+      z-index: 35;
+      transform: translateX(120%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .3s ease, opacity .28s ease;
+      background: linear-gradient(165deg, rgba(9, 18, 40, .92), rgba(20, 32, 62, .88));
+      border: 1px solid rgba(112, 203, 255, .4);
+      box-shadow: var(--shadow), 0 0 0 1px rgba(149, 225, 255, .2), 0 0 34px rgba(91, 155, 255, .28);
+      backdrop-filter: blur(14px);
+    }
+    .filter-sidebar.is-open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .filter-sidebar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
     .filter-sidebar label {
       display: grid;
@@ -659,22 +721,25 @@
     .collection-card {
       padding: 0;
       overflow: hidden;
-      border-radius: 16px;
-      border: 1px solid rgba(93, 176, 255, .35);
-      background: linear-gradient(170deg, rgba(18, 30, 56, .95), rgba(10, 18, 37, .95));
-      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+      border-radius: 18px;
+      border: 1px solid rgba(93, 176, 255, .4);
+      background:
+        linear-gradient(175deg, rgba(16, 29, 58, .93), rgba(9, 18, 36, .96));
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease, filter .25s ease;
+      box-shadow: 0 8px 24px rgba(4, 12, 26, .55), inset 0 1px 0 rgba(199, 239, 255, .08);
     }
     .collection-card:hover {
-      transform: translateY(-4px) scale(1.02);
-      border-color: var(--accent);
-      box-shadow: var(--shadow-soft), var(--accent-glow);
+      transform: translateY(-6px) scale(1.02);
+      border-color: rgba(113, 225, 255, .86);
+      box-shadow: var(--shadow), 0 0 0 1px rgba(98, 221, 255, .45), 0 0 30px rgba(74, 190, 255, .3);
+      filter: saturate(1.08);
     }
     .collection-card .card-media {
       position: relative;
     }
     .collection-card .video-thumb {
       width: 100%;
-      height: 160px;
+      height: 172px;
       object-fit: cover;
       border: 0;
       margin: 0;
@@ -697,7 +762,7 @@
     .collection-card .card-footer {
       border-top: 1px solid rgba(98, 168, 255, .3);
       padding: 10px 12px;
-      background: rgba(8, 17, 33, .92);
+      background: rgba(7, 15, 32, .92);
       display: grid;
       gap: 4px;
     }
@@ -732,18 +797,40 @@
       text-shadow: 0 0 16px rgba(43, 247, 255, .25);
     }
     .collection-progress {
-      height: 12px;
+      height: 14px;
       border-radius: 999px;
-      border: 1px solid rgba(111, 180, 255, .35);
-      background: rgba(8, 19, 39, .9);
+      border: 1px solid rgba(111, 180, 255, .45);
+      background: rgba(8, 19, 39, .78);
       overflow: hidden;
+      box-shadow: inset 0 0 10px rgba(6, 13, 28, .8), 0 0 18px rgba(67, 160, 255, .2);
     }
     .collection-progress-bar {
       height: 100%;
       width: var(--collection-progress, 0%);
-      background: linear-gradient(90deg, rgba(55, 158, 255, .75), rgba(43, 247, 255, .85));
-      box-shadow: 0 0 20px rgba(43, 247, 255, .35);
+      background: linear-gradient(90deg, rgba(64, 129, 255, .8), rgba(92, 236, 255, .96), rgba(175, 114, 255, .82));
+      background-size: 220% 220%;
+      box-shadow: 0 0 20px rgba(43, 247, 255, .45), 0 0 14px rgba(151, 122, 255, .3);
       transition: width .35s ease;
+      animation: pulseProgress 3.4s linear infinite;
+    }
+    @keyframes pulseProgress {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    .universe-view-animated {
+      animation: fade .32s ease;
+    }
+
+    .neon-action {
+      border-radius: 12px;
+      border-color: rgba(122, 220, 255, .5);
+      background: linear-gradient(155deg, rgba(15, 34, 64, .94), rgba(16, 47, 87, .82));
+      box-shadow: inset 0 1px 0 rgba(218, 247, 255, .1), 0 0 0 1px rgba(70, 140, 255, .2);
+    }
+    .neon-action:hover {
+      border-color: rgba(122, 220, 255, .9);
+      box-shadow: 0 0 0 1px rgba(122, 220, 255, .45), 0 0 22px rgba(91, 160, 255, .3);
     }
     .collection-character-card.locked {
       border-style: dashed;
@@ -2206,10 +2293,10 @@
       const universeNode = state.universeNodes.find(node => node.name === state.universe);
       const headerCover = getSafeUniverseCover(state.universe, universeNode?.cover || getUniverseCover(videos));
       viewUniverse.innerHTML = `
-        <div class="actions">
+        <div class="actions universe-view-animated">
           <button id="backMap" class="neon-btn">← Volver al mapa</button>
         </div>
-        <section class="hud-panel universe-header">
+        <section class="hud-panel universe-header universe-view-animated">
           <div class="universe-hero">
             <img src="${headerCover}" alt="Portada de ${state.universe}">
             <div>
@@ -2218,17 +2305,19 @@
               <span class="completion-badge completion-badge--${universeData.state}">
                 ${universeData.state === 'complete' ? 'Completo' : universeData.state === 'advanced' ? 'Avanzado' : 'Incompleto'} · ${universeData.completion}%
               </span>
-              <span class="completion-track" aria-hidden="true">
-                <span class="completion-fill completion-fill--${universeData.state}" style="width:${universeData.completion}%;"></span>
-              </span>
+              <div class="collection-kpi" style="margin-top:10px;">
+                <div class="collection-progress" aria-hidden="true">
+                  <div class="collection-progress-bar" style="--collection-progress:${universeData.completion}%; width:${universeData.completion}%;"></div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="universe-controls">
-            <button id="editUniverse" class="neon-btn">Editar universo</button>
-            <button id="deleteUniverse" class="neon-btn">Eliminar universo</button>
+            <button id="editUniverse" class="neon-btn neon-action">Editar universo</button>
+            <button id="deleteUniverse" class="neon-btn neon-action">Eliminar universo</button>
             <button
               id="btn-toggle-video"
-              class="neon-btn neon-btn--primary"
+              class="neon-btn neon-btn--primary neon-action"
               aria-expanded="${state.showAddForm ? 'true' : 'false'}"
             >
               ${state.showAddForm ? 'CERRAR' : 'AGREGAR VIDEO'}
@@ -2257,7 +2346,13 @@
           </div>
         </form>
 
-        <div class="universe-gallery-layout">
+        <div class="universe-toolbar universe-view-animated">
+          <button id="openFilters" class="neon-btn icon-btn neon-action" aria-label="Abrir filtros" aria-expanded="false">
+            <span>🔍</span>
+          </button>
+        </div>
+
+        <div class="universe-gallery-layout universe-view-animated">
           <section class="hud-panel">
             <div class="video-grid">
               ${filtered.map(v => `
@@ -2276,24 +2371,26 @@
               `).join('') || '<p class="muted">No hay resultados con estos filtros.</p>'}
             </div>
           </section>
-
-          <aside class="hud-panel filter-sidebar">
-            <h3 class="section-title">Filtro</h3>
-            <label>Buscar personaje
-              <input id="searchCharacter" type="search" value="${state.search.personaje}" placeholder="Ej. Goku">
-            </label>
-            <label>Buscar actor
-              <input id="searchActor" type="search" value="${state.search.actor}" placeholder="Ej. Mario Castañeda">
-            </label>
-            <label>Rareza
-              <select id="filterRarity">
-                <option value="todos">Todas</option>
-                ${rarezas.map(r => `<option value="${r}" ${state.filters.rareza === r ? 'selected' : ''}>${r}</option>`).join('')}
-              </select>
-            </label>
-            <button id="clearFilters" class="neon-btn">Limpiar filtros</button>
-          </aside>
         </div>
+        <aside id="filtersPanel" class="hud-panel filter-sidebar" aria-hidden="true">
+          <div class="filter-sidebar-head">
+            <h3 class="section-title" style="margin:0;">Filtros</h3>
+            <button id="closeFilters" class="neon-btn icon-btn neon-action" aria-label="Cerrar filtros"><span>✕</span></button>
+          </div>
+          <label>Buscar personaje
+            <input id="searchCharacter" type="search" value="${state.search.personaje}" placeholder="Ej. Goku">
+          </label>
+          <label>Buscar actor
+            <input id="searchActor" type="search" value="${state.search.actor}" placeholder="Ej. Mario Castañeda">
+          </label>
+          <label>Rareza
+            <select id="filterRarity">
+              <option value="todos">Todas</option>
+              ${rarezas.map(r => `<option value="${r}" ${state.filters.rareza === r ? 'selected' : ''}>${r}</option>`).join('')}
+            </select>
+          </label>
+          <button id="clearFilters" class="neon-btn neon-action">Limpiar filtros</button>
+        </aside>
       `;
 
       document.getElementById('backMap').onclick = () => changeView('map');
@@ -2397,6 +2494,21 @@
         state.search = { personaje: '', actor: '' };
         renderUniverseView();
       };
+
+      const filtersPanel = document.getElementById('filtersPanel');
+      const openFiltersBtn = document.getElementById('openFilters');
+      const closeFiltersBtn = document.getElementById('closeFilters');
+      const setFiltersPanel = (isOpen) => {
+        if (!filtersPanel) return;
+        filtersPanel.classList.toggle('is-open', isOpen);
+        filtersPanel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        openFiltersBtn?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      };
+      openFiltersBtn?.addEventListener('click', () => setFiltersPanel(true));
+      closeFiltersBtn?.addEventListener('click', () => setFiltersPanel(false));
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') setFiltersPanel(false);
+      }, { once: true });
 
       document.getElementById('searchCharacter').oninput = (e) => { state.search.personaje = e.target.value; renderUniverseView(); };
       document.getElementById('searchActor').oninput = (e) => { state.search.actor = e.target.value; renderUniverseView(); };
