@@ -656,6 +656,74 @@
       display: inline-block;
       min-width: 54px;
     }
+    .collection-view {
+      display: grid;
+      gap: 14px;
+    }
+    .collection-kpi {
+      display: grid;
+      gap: 8px;
+    }
+    .collection-kpi-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .collection-kpi-value {
+      font-size: clamp(1.4rem, 1.1rem + .9vw, 2rem);
+      font-weight: 800;
+      text-shadow: 0 0 16px rgba(43, 247, 255, .25);
+    }
+    .collection-progress {
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(111, 180, 255, .35);
+      background: rgba(8, 19, 39, .9);
+      overflow: hidden;
+    }
+    .collection-progress-bar {
+      height: 100%;
+      width: var(--collection-progress, 0%);
+      background: linear-gradient(90deg, rgba(55, 158, 255, .75), rgba(43, 247, 255, .85));
+      box-shadow: 0 0 20px rgba(43, 247, 255, .35);
+      transition: width .35s ease;
+    }
+    .collection-character-card.locked {
+      border-style: dashed;
+      opacity: .9;
+      filter: grayscale(.45);
+    }
+    .collection-character-card .locked-silhouette {
+      width: 100%;
+      height: 160px;
+      display: grid;
+      place-items: center;
+      font-size: 2.2rem;
+      background:
+        radial-gradient(circle at 50% 30%, rgba(121, 151, 190, .22), transparent 56%),
+        linear-gradient(180deg, rgba(27, 41, 69, .9), rgba(10, 18, 35, .95));
+      color: rgba(223, 243, 255, .82);
+      border-bottom: 1px solid rgba(98, 168, 255, .3);
+    }
+    .collection-character-card.locked .meta {
+      color: #abc0d9;
+    }
+    .collection-character-card.unlocked {
+      cursor: pointer;
+    }
+    .collection-character-card.unlocked:hover {
+      transform: translateY(-4px) scale(1.02);
+    }
+    .collection-character-card.is-newly-unlocked {
+      animation: unlockPulse 1.15s ease;
+    }
+    @keyframes unlockPulse {
+      0% { box-shadow: 0 0 0 rgba(43, 247, 255, 0); filter: brightness(.85); }
+      45% { box-shadow: 0 0 0 1px rgba(43, 247, 255, .55), 0 0 32px rgba(43, 247, 255, .55); filter: brightness(1.15); }
+      100% { box-shadow: var(--shadow-soft); filter: brightness(1); }
+    }
 
     .primary-btn {
       background: linear-gradient(135deg, rgba(23, 103, 153, .9), rgba(43, 247, 255, .52));
@@ -1013,16 +1081,17 @@
         <nav class="sidebar-nav">
           <button id="navInicio" class="sidebar-item"><span class="sidebar-emoji">🏠</span><span class="sidebar-label">1. Inicio</span></button>
           <button id="navUniverses" class="sidebar-item active"><span class="sidebar-emoji">🪐</span><span class="sidebar-label">2. Universos</span></button>
-          <button id="navIndice" class="sidebar-item"><span class="sidebar-emoji">📚</span><span class="sidebar-label">3. Índice</span></button>
-          <button id="navMaraton" class="sidebar-item"><span class="sidebar-emoji">🎬</span><span class="sidebar-label">4. Maratón</span></button>
-          <button id="navRarezas" class="sidebar-item"><span class="sidebar-emoji">💎</span><span class="sidebar-label">5. Rarezas</span></button>
-          <button id="navActores" class="sidebar-item"><span class="sidebar-emoji">🎙️</span><span class="sidebar-label">6. Actores</span></button>
-          <button id="navVersiones" class="sidebar-item"><span class="sidebar-emoji">🧬</span><span class="sidebar-label">7. Versiones</span></button>
-          <button id="navAchievements" class="sidebar-item"><span class="sidebar-emoji">🏆</span><span class="sidebar-label">8. Logros</span></button>
-          <button id="navFavoritos" class="sidebar-item"><span class="sidebar-emoji">⭐</span><span class="sidebar-label">9. Favoritos</span></button>
-          <button id="navBuscar" class="sidebar-item"><span class="sidebar-emoji">🔎</span><span class="sidebar-label">10. Buscar</span></button>
-          <button id="navStats" class="sidebar-item"><span class="sidebar-emoji">📈</span><span class="sidebar-label">11. Estadísticas</span></button>
-          <button id="navConfig" class="sidebar-item"><span class="sidebar-emoji">⚙️</span><span class="sidebar-label">12. Configuración</span></button>
+          <button id="navCollection" class="sidebar-item"><span class="sidebar-emoji">🃏</span><span class="sidebar-label">3. Colección</span></button>
+          <button id="navIndice" class="sidebar-item"><span class="sidebar-emoji">📚</span><span class="sidebar-label">4. Índice</span></button>
+          <button id="navMaraton" class="sidebar-item"><span class="sidebar-emoji">🎬</span><span class="sidebar-label">5. Maratón</span></button>
+          <button id="navRarezas" class="sidebar-item"><span class="sidebar-emoji">💎</span><span class="sidebar-label">6. Rarezas</span></button>
+          <button id="navActores" class="sidebar-item"><span class="sidebar-emoji">🎙️</span><span class="sidebar-label">7. Actores</span></button>
+          <button id="navVersiones" class="sidebar-item"><span class="sidebar-emoji">🧬</span><span class="sidebar-label">8. Versiones</span></button>
+          <button id="navAchievements" class="sidebar-item"><span class="sidebar-emoji">🏆</span><span class="sidebar-label">9. Logros</span></button>
+          <button id="navFavoritos" class="sidebar-item"><span class="sidebar-emoji">⭐</span><span class="sidebar-label">10. Favoritos</span></button>
+          <button id="navBuscar" class="sidebar-item"><span class="sidebar-emoji">🔎</span><span class="sidebar-label">11. Buscar</span></button>
+          <button id="navStats" class="sidebar-item"><span class="sidebar-emoji">📈</span><span class="sidebar-label">12. Estadísticas</span></button>
+          <button id="navConfig" class="sidebar-item"><span class="sidebar-emoji">⚙️</span><span class="sidebar-label">13. Configuración</span></button>
         </nav>
       </aside>
 
@@ -1030,6 +1099,7 @@
         <section id="viewInicio" class="view"></section>
         <section id="viewMap" class="view active"></section>
         <section id="viewUniverse" class="view"></section>
+        <section id="viewCollection" class="view"></section>
         <section id="viewIndice" class="view"></section>
         <section id="viewMaraton" class="view"></section>
         <section id="viewRarezas" class="view"></section>
@@ -1095,6 +1165,7 @@
     const toggleSidebar = document.getElementById('toggleSidebar');
     const navInicio = document.getElementById('navInicio');
     const navUniverses = document.getElementById('navUniverses');
+    const navCollection = document.getElementById('navCollection');
     const navIndice = document.getElementById('navIndice');
     const navMaraton = document.getElementById('navMaraton');
     const navRarezas = document.getElementById('navRarezas');
@@ -1108,6 +1179,7 @@
     const viewInicio = document.getElementById('viewInicio');
     const viewMap = document.getElementById('viewMap');
     const viewUniverse = document.getElementById('viewUniverse');
+    const viewCollection = document.getElementById('viewCollection');
     const viewIndice = document.getElementById('viewIndice');
     const viewMaraton = document.getElementById('viewMaraton');
     const viewRarezas = document.getElementById('viewRarezas');
@@ -1398,6 +1470,58 @@
       )];
     }
 
+    function partialName(name) {
+      const clean = String(name || '').trim();
+      if (!clean) return '????';
+      if (clean.length <= 3) return `${clean[0] || '?'}••`;
+      return `${clean.slice(0, 2)}${'•'.repeat(Math.max(2, clean.length - 2))}`;
+    }
+
+    function getGlobalCharacterCollection() {
+      const byCharacter = new Map();
+      const register = (characterName, payload) => {
+        if (!characterName) return;
+        const id = cssSafe(characterName);
+        const existing = byCharacter.get(id);
+        byCharacter.set(id, existing ? { ...existing, ...payload } : { id, name: characterName, ...payload });
+      };
+
+      VIDEOS.forEach((video) => {
+        const name = String(video.personaje || 'Sin personaje').trim();
+        if (!name) return;
+        register(name, {
+          unlocked: true,
+          actor: video.actor_de_doblaje || 'Sin actor',
+          rareza: video.rareza || 'Común',
+          universes: [...new Set(VIDEOS
+            .filter(v => (v.personaje || 'Sin personaje') === name)
+            .flatMap(v => getVideoUniverses(v))
+            .filter(Boolean))],
+          videoId: video.id,
+          thumbnail: video.thumbnail || getVideoThumbnail(video)
+        });
+      });
+
+      Object.entries(state.blockedCharactersByActor || {}).forEach(([actor, list]) => {
+        (Array.isArray(list) ? list : []).forEach((characterName) => {
+          const cleanName = String(characterName || '').trim();
+          if (!cleanName) return;
+          const id = cssSafe(cleanName);
+          if (byCharacter.get(id)?.unlocked) return;
+          register(cleanName, {
+            unlocked: false,
+            actor: actor || 'Sin actor',
+            rareza: 'Bloqueado',
+            universes: [],
+            videoId: '',
+            thumbnail: ''
+          });
+        });
+      });
+
+      return [...byCharacter.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    }
+
     function unlockBlockedCharacterForActor(actorName, characterName) {
       if (!actorName || !characterName) return;
       const blocked = state.blockedCharactersByActor[actorName] || [];
@@ -1405,6 +1529,7 @@
       if (filtered.length) state.blockedCharactersByActor[actorName] = filtered;
       else delete state.blockedCharactersByActor[actorName];
       saveBlockedCharacters();
+      if (state.view === 'collection') renderCollectionView();
     }
 
     function loadUniverseNodesFromStorage() {
@@ -2478,6 +2603,81 @@
       `;
     }
 
+    function renderCharacterProfile(characterId) {
+      const entry = getGlobalCharacterCollection().find(item => item.id === characterId);
+      if (!entry || !entry.unlocked) return;
+      openCharacterProfile(entry.name);
+    }
+
+    function renderCollectionView() {
+      const characters = getGlobalCharacterCollection();
+      const total = characters.length;
+      const unlocked = characters.filter(item => item.unlocked).length;
+      const percent = total ? Math.round((unlocked / total) * 100) : 0;
+      const previousSnapshot = state.collectionUnlockSnapshot || {};
+      const nextSnapshot = {};
+
+      viewCollection.innerHTML = `
+        <section class="collection-view">
+          <article class="hud-panel collection-kpi">
+            <div class="collection-kpi-head">
+              <h2 class="section-title">Colección global de personajes</h2>
+              <span class="collection-kpi-value">${unlocked}/${total}</span>
+            </div>
+            <p class="section-subtitle">Progreso desbloqueado: ${percent}%</p>
+            <div class="collection-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
+              <div class="collection-progress-bar" style="--collection-progress:${percent}%;"></div>
+            </div>
+          </article>
+
+          <section class="grid">
+            ${characters.map((character) => {
+              nextSnapshot[character.id] = Boolean(character.unlocked);
+              const hadPreviousState = Object.prototype.hasOwnProperty.call(previousSnapshot, character.id);
+              const newlyUnlocked = hadPreviousState && !previousSnapshot[character.id] && character.unlocked;
+              if (!character.unlocked) {
+                return `
+                  <article class="collection-card collection-character-card locked">
+                    <div class="locked-silhouette" aria-hidden="true">👤</div>
+                    <div class="card-footer">
+                      <p class="meta"><small>Personaje:</small>${partialName(character.name)}</p>
+                      <p class="meta"><small>Estado:</small>🔒 Bloqueado</p>
+                      <p class="meta"><small>Actor:</small>${character.actor || 'Sin actor'}</p>
+                    </div>
+                  </article>
+                `;
+              }
+              return `
+                <article
+                  class="collection-card collection-character-card unlocked ${newlyUnlocked ? 'is-newly-unlocked' : ''}"
+                  data-character-id="${character.id}"
+                >
+                  <div class="card-media">
+                    <img class="video-thumb" src="${character.thumbnail || createPlaceholderCover(character.name)}" alt="Miniatura de ${character.name}" loading="lazy">
+                    <p class="card-title">${character.name}</p>
+                  </div>
+                  <div class="card-footer">
+                    <p class="meta"><small>Actor:</small>${character.actor || 'Sin actor'}</p>
+                    <p class="meta"><small>Universos:</small>${character.universes.length ? character.universes.join(', ') : 'Sin universo'}</p>
+                    <span class="badge ${rarityClass(character.rareza || 'Común')}">${character.rareza || 'Común'}</span>
+                  </div>
+                </article>
+              `;
+            }).join('') || '<p class="muted">No hay personajes cargados todavía.</p>'}
+          </section>
+        </section>
+      `;
+
+      state.collectionUnlockSnapshot = nextSnapshot;
+      viewCollection.querySelectorAll('[data-character-id]').forEach((card) => {
+        card.addEventListener('click', () => {
+          const { characterId } = card.dataset;
+          if (!characterId) return;
+          renderCharacterProfile(characterId);
+        });
+      });
+    }
+
     function renderIndiceView() {
       const indexItems = getCharactersIndex(VIDEOS).slice(0, 8);
       viewIndice.innerHTML = `
@@ -2588,6 +2788,7 @@
         const current = state.blockedCharactersByActor[actor] || [];
         state.blockedCharactersByActor[actor] = [...new Set([...current, characterName])];
         saveBlockedCharacters();
+        if (state.view === 'collection') renderCollectionView();
         renderActoresView();
       });
       viewActores.querySelectorAll('[data-open-character]').forEach((btn) => {
@@ -2723,6 +2924,7 @@
       viewInicio.classList.toggle('active', next === 'inicio');
       viewMap.classList.toggle('active', next === 'map');
       viewUniverse.classList.toggle('active', next === 'universe');
+      viewCollection.classList.toggle('active', next === 'collection');
       viewIndice.classList.toggle('active', next === 'indice');
       viewMaraton.classList.toggle('active', next === 'maraton');
       viewRarezas.classList.toggle('active', next === 'rarezas');
@@ -2739,6 +2941,7 @@
         inicio: navInicio,
         map: navUniverses,
         universe: navUniverses,
+        collection: navCollection,
         indice: navIndice,
         maraton: navMaraton,
         rarezas: navRarezas,
@@ -2756,6 +2959,7 @@
       if (next === 'inicio') renderInicioView();
       if (next === 'map') renderMapView();
       if (next === 'universe') renderUniverseView();
+      if (next === 'collection') renderCollectionView();
       if (next === 'achievements') renderAchievementsView();
       if (next === 'indice') renderIndiceView();
       if (next === 'maraton') renderMaratonView();
@@ -2776,6 +2980,7 @@
 
     navInicio.onclick = () => changeView('inicio');
     navUniverses.onclick = () => changeView(state.universe ? 'universe' : 'map');
+    navCollection.onclick = () => changeView('collection');
     navIndice.onclick = () => changeView('indice');
     navMaraton.onclick = () => changeView('maraton');
     navRarezas.onclick = () => changeView('rarezas');
