@@ -1043,20 +1043,18 @@
       list-style: none;
       margin: 0;
       padding: 0;
-      display: grid;
-      gap: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
     }
     .actor-character-item {
-      padding: 10px;
+      width: min(190px, 100%);
+      padding: 8px;
       border-radius: 12px;
       border: 1px solid rgba(111, 180, 255, .26);
       background: rgba(13, 25, 49, .72);
       display: grid;
-      gap: 8px;
-    }
-    .actor-character-item h4 {
-      margin: 0;
-      font-size: .98rem;
+      gap: 6px;
     }
     .actor-character-item.locked {
       border-style: dashed;
@@ -1064,7 +1062,6 @@
     }
     .actor-character-video {
       width: 100%;
-      max-width: 260px;
       border: 1px solid rgba(111, 180, 255, .4);
       border-radius: 12px;
       overflow: hidden;
@@ -1074,7 +1071,7 @@
     }
     .actor-character-video img {
       width: 100%;
-      height: 140px;
+      aspect-ratio: 9 / 16;
       object-fit: cover;
       display: block;
     }
@@ -1083,6 +1080,28 @@
       padding: 6px 10px;
       color: #cde6ff;
       font-size: .86rem;
+    }
+    .actor-character-link {
+      display: block;
+      width: 100%;
+      text-align: center;
+      font-size: .92rem;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .actor-character-thumb-empty {
+      width: 100%;
+      aspect-ratio: 9 / 16;
+      border: 1px dashed rgba(111, 180, 255, .35);
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: #9fb5cb;
+      font-size: .85rem;
+      text-align: center;
+      padding: 8px;
+      background: rgba(7, 14, 28, .55);
     }
     .actor-locked-note {
       margin: 0;
@@ -1556,6 +1575,7 @@
       search: { personaje: '', actor: '' },
       selectedVideoId: null,
       actorFocus: null,
+      actorDetailsExpanded: false,
       showAddForm: false,
       marathon: { active: false, queue: [], position: 0 },
       universeNodes: [],
@@ -2861,6 +2881,7 @@
         if (!actorName) return;
         modal.remove();
         state.actorFocus = actorName;
+        state.actorDetailsExpanded = true;
         changeView('actores');
       });
       modal.querySelector('#editVideo')?.addEventListener('click', () => {
@@ -3318,7 +3339,11 @@
         ? collectionModel.actors.map(item => item.name)
         : [...new Set(VIDEOS.map(v => v.actor_de_doblaje).filter(Boolean))]
       ).sort();
-      const actor = state.actorFocus || actors[0] || null;
+      if (state.actorFocus && !actors.includes(state.actorFocus)) {
+        state.actorFocus = null;
+        state.actorDetailsExpanded = false;
+      }
+      const actor = state.actorFocus || null;
       const actorVideos = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === actor);
       const actorCharacters = [...new Set(actorVideos.map(v => v.personaje || 'Sin personaje'))];
       const blockedCharacters = state.blockedCharactersByActor[actor] || [];
@@ -3358,7 +3383,7 @@
               `;
             }).join('') || '<p class="muted">Sin actores registrados.</p>'}
           </div>
-          ${actor ? `
+          ${actor && state.actorDetailsExpanded ? `
             <article class="mock-box actor-detail-grid">
               <div>
               <h3>${actor}</h3>
@@ -3366,14 +3391,13 @@
                 <ul class="actor-character-list">
                   ${actorCharacterCards.map((item) => `
                     <li class="actor-character-item ${item.unlocked ? 'unlocked' : 'locked'}">
-                      <h4>${item.characterName}</h4>
                       ${item.unlocked && item.video ? `
                         <button type="button" class="actor-character-video" data-open-video="${item.video.id}">
                           <img src="${getVideoThumbnail(item.video)}" alt="Miniatura de ${item.characterName}">
                           <span>Ver saludo</span>
                         </button>
-                      ` : '<p class="actor-locked-note">🔒 Bloqueado (sin video cargado).</p>'}
-                      <button type="button" class="character-link" data-open-character="${item.characterName}">Ver perfil del personaje</button>
+                      ` : '<div class="actor-character-thumb-empty">🔒 Sin saludo disponible</div>'}
+                      <button type="button" class="character-link actor-character-link" data-open-character="${item.characterName}">${item.characterName}</button>
                     </li>
                   `).join('') || '<li class="actor-character-item locked">Sin personajes registrados.</li>'}
                 </ul>
@@ -3393,7 +3417,14 @@
       `;
       viewActores.querySelectorAll('[data-actor-card]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          state.actorFocus = btn.dataset.actorCard;
+          const clickedActor = btn.dataset.actorCard;
+          if (!clickedActor) return;
+          if (state.actorFocus === clickedActor && state.actorDetailsExpanded) {
+            state.actorDetailsExpanded = false;
+          } else {
+            state.actorFocus = clickedActor;
+            state.actorDetailsExpanded = true;
+          }
           renderActoresView();
         });
       });
@@ -3412,6 +3443,7 @@
           saveCollectionModel();
         }
         state.actorFocus = existing?.name || actorName;
+        state.actorDetailsExpanded = true;
         if (input) input.value = '';
         renderActoresView();
       });
