@@ -1328,8 +1328,9 @@
     }
     .characters-gallery {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(118px, 118px));
+      justify-content: start;
+      gap: 10px;
     }
     .character-gallery-card {
       border: 1px solid rgba(111, 180, 255, .35);
@@ -1340,6 +1341,10 @@
       cursor: pointer;
       text-align: left;
       padding: 0;
+      width: 118px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
     }
     .character-gallery-card:hover {
       border-color: rgba(111, 239, 255, .82);
@@ -1348,25 +1353,28 @@
     }
     .character-gallery-card img {
       width: 100%;
-      height: 150px;
+      aspect-ratio: 3 / 4;
+      height: auto;
       object-fit: cover;
       display: block;
       border-bottom: 1px solid rgba(111, 180, 255, .25);
       background: rgba(10, 17, 36, .85);
     }
     .character-gallery-card .meta {
-      padding: 10px 12px 12px;
+      padding: 8px 8px 10px;
       display: grid;
-      gap: 5px;
+      gap: 3px;
     }
     .character-gallery-card h3 {
       margin: 0;
-      font-size: .98rem;
+      font-size: .82rem;
+      line-height: 1.2;
     }
     .character-gallery-card p {
       margin: 0;
       color: #9cc0e6;
-      font-size: .87rem;
+      font-size: .75rem;
+      line-height: 1.15;
     }
     .character-actors-grid {
       display: grid;
