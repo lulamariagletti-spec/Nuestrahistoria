@@ -1293,6 +1293,101 @@
       display: grid;
       gap: 14px;
     }
+    .characters-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+    }
+    .character-gallery-card {
+      border: 1px solid rgba(111, 180, 255, .35);
+      border-radius: 14px;
+      overflow: hidden;
+      background: linear-gradient(170deg, rgba(13, 26, 50, .92), rgba(7, 14, 31, .95));
+      box-shadow: var(--shadow-soft);
+      cursor: pointer;
+      text-align: left;
+      padding: 0;
+    }
+    .character-gallery-card:hover {
+      border-color: rgba(111, 239, 255, .82);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow), 0 0 24px rgba(78, 180, 255, .28);
+    }
+    .character-gallery-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      display: block;
+      border-bottom: 1px solid rgba(111, 180, 255, .25);
+      background: rgba(10, 17, 36, .85);
+    }
+    .character-gallery-card .meta {
+      padding: 10px 12px 12px;
+      display: grid;
+      gap: 5px;
+    }
+    .character-gallery-card h3 {
+      margin: 0;
+      font-size: .98rem;
+    }
+    .character-gallery-card p {
+      margin: 0;
+      color: #9cc0e6;
+      font-size: .87rem;
+    }
+    .character-actors-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .character-actor-card {
+      border: 1px solid rgba(111, 180, 255, .35);
+      border-radius: 12px;
+      overflow: hidden;
+      background: linear-gradient(170deg, rgba(13, 26, 50, .92), rgba(7, 14, 31, .95));
+      box-shadow: var(--shadow-soft);
+      text-align: left;
+      padding: 0;
+    }
+    .character-actor-card img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+      display: block;
+      background: rgba(10, 17, 36, .85);
+      border-bottom: 1px solid rgba(111, 180, 255, .25);
+    }
+    .character-actor-card .meta {
+      padding: 10px 12px 12px;
+      display: grid;
+      gap: 4px;
+    }
+    .character-actor-card h3 {
+      margin: 0;
+      font-size: .95rem;
+    }
+    .character-actor-card p {
+      margin: 0;
+      color: #9cc0e6;
+      font-size: .84rem;
+    }
+    .character-actor-card.unlocked {
+      cursor: pointer;
+      transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+    }
+    .character-actor-card.unlocked:hover {
+      border-color: rgba(111, 239, 255, .82);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow), 0 0 20px rgba(78, 180, 255, .24);
+    }
+    .character-actor-card.locked {
+      filter: grayscale(.65);
+      opacity: .82;
+      border-style: dashed;
+    }
+    .character-actor-card.locked img {
+      filter: blur(1px) brightness(.55);
+    }
     .mock-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
     .mock-box {
       background: var(--panel-2);
@@ -1425,7 +1520,9 @@
       universeNodes: [],
       mapCanvas: { width: 1400, height: 900 },
       blockedCharactersByActor: {},
-      characterProfileId: null
+      characterProfileId: null,
+      indiceSearch: '',
+      indiceCharacterFocus: null
     };
     const UNIVERSES_STORAGE_KEY = 'universes_map_v1';
     const VIDEOS_STORAGE_KEY = 'videos_collection_v1';
@@ -3016,19 +3113,126 @@
       });
     }
 
+    function getCharacterActorsForIndice(characterName) {
+      const normalizedCharacter = normalizeName(characterName);
+      const videosByCharacter = VIDEOS.filter(video => normalizeName(video.personaje || 'Sin personaje') === normalizedCharacter);
+      const unlockedByActor = new Map();
+      videosByCharacter.forEach((video) => {
+        const actorName = String(video.actor_de_doblaje || 'Sin actor').trim() || 'Sin actor';
+        if (!unlockedByActor.has(actorName)) unlockedByActor.set(actorName, video);
+      });
+      const blockedActors = Object.entries(state.blockedCharactersByActor)
+        .filter(([actorName, blockedList]) => blockedList.some(item => normalizeName(item) === normalizedCharacter)
+          && !unlockedByActor.has(actorName))
+        .map(([actorName]) => actorName);
+      return { unlockedByActor, blockedActors };
+    }
+
+    function getCharactersForIndice(searchTerm = '') {
+      const grouped = new Map();
+      VIDEOS.forEach((video) => {
+        const characterName = String(video.personaje || 'Sin personaje').trim() || 'Sin personaje';
+        const normalized = normalizeName(characterName);
+        if (!grouped.has(normalized)) {
+          grouped.set(normalized, {
+            name: characterName,
+            versions: [],
+            coverVideo: null
+          });
+        }
+        const record = grouped.get(normalized);
+        record.versions.push(video);
+        if (!record.coverVideo && hasGreetingVideo(video)) record.coverVideo = video;
+      });
+      const normalizedSearch = normalizeName(searchTerm || '');
+      return [...grouped.values()]
+        .map((item) => {
+          const { unlockedByActor, blockedActors } = getCharacterActorsForIndice(item.name);
+          return {
+            ...item,
+            actorCount: unlockedByActor.size + blockedActors.length
+          };
+        })
+        .filter(item => !normalizedSearch || normalizeName(item.name).includes(normalizedSearch))
+        .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+    }
+
     function renderIndiceView() {
-      const indexItems = getCharactersIndex(VIDEOS).slice(0, 8);
+      const focusedCharacter = state.indiceCharacterFocus;
+      if (focusedCharacter) {
+        const { unlockedByActor, blockedActors } = getCharacterActorsForIndice(focusedCharacter);
+        const unlockedActors = [...unlockedByActor.entries()]
+          .map(([actorName, video]) => ({ actorName, video, locked: false }));
+        const lockedActors = blockedActors.map(actorName => ({ actorName, video: null, locked: true }));
+        const actorCards = [...unlockedActors, ...lockedActors]
+          .sort((a, b) => a.actorName.localeCompare(b.actorName, 'es', { sensitivity: 'base' }));
+        viewIndice.innerHTML = `
+          <section class="mock-shell">
+            <div class="actions">
+              <button id="backToCharacterGallery" class="neon-btn">← Volver a personajes</button>
+            </div>
+            <h2>${focusedCharacter}</h2>
+            <p class="section-subtitle">Actores asociados: ${actorCards.length} · desbloqueados: ${unlockedActors.length} · bloqueados: ${lockedActors.length}</p>
+            <section class="character-actors-grid">
+              ${actorCards.map(item => item.locked
+                ? `
+                  <article class="character-actor-card locked" aria-disabled="true">
+                    <img src="${createPlaceholderCover(item.actorName)}" alt="Actor bloqueado: ${item.actorName}" loading="lazy">
+                    <div class="meta">
+                      <h3>${item.actorName}</h3>
+                      <p>🔒 Bloqueado</p>
+                    </div>
+                  </article>
+                `
+                : `
+                  <button type="button" class="character-actor-card unlocked" data-open-video="${item.video.id}">
+                    <img src="${getVideoThumbnail(item.video)}" alt="Miniatura de ${item.actorName} como ${focusedCharacter}" loading="lazy">
+                    <div class="meta">
+                      <h3>${item.actorName}</h3>
+                      <p>▶ Ver video</p>
+                    </div>
+                  </button>
+                `).join('') || '<p class="muted">No hay actores asociados para este personaje.</p>'}
+            </section>
+          </section>
+        `;
+        document.getElementById('backToCharacterGallery')?.addEventListener('click', () => {
+          state.indiceCharacterFocus = null;
+          renderIndiceView();
+        });
+        viewIndice.querySelectorAll('[data-open-video]').forEach((btn) => {
+          btn.addEventListener('click', () => openVideoDetail(btn.dataset.openVideo));
+        });
+        return;
+      }
+
+      const indexItems = getCharactersForIndice(state.indiceSearch);
       viewIndice.innerHTML = `
         <section class="mock-shell">
           <h2>Índice de Personajes</h2>
-          <input type="search" placeholder="Filtrar personaje en terminal..." aria-label="Buscar personaje en índice">
-          <ul class="terminal-list">
-            ${indexItems.map(item => `<li><button type="button" class="character-link" data-open-character="${item.personaje}">> ${item.personaje}</button> · ${item.versions.length} versión(es)</li>`).join('') || '<li>> Sin personajes cargados</li>'}
-          </ul>
+          <input id="indiceSearchInput" type="search" value="${state.indiceSearch}" placeholder="Filtrar personaje..." aria-label="Buscar personaje en índice">
+          <section class="characters-gallery">
+            ${indexItems.map(item => `
+              <button type="button" class="character-gallery-card" data-open-character="${item.name}">
+                <img src="${item.coverVideo ? getVideoThumbnail(item.coverVideo) : createPlaceholderCover(item.name)}" alt="Portada de ${item.name}" loading="lazy">
+                <div class="meta">
+                  <h3>${item.name}</h3>
+                  <p>${item.actorCount} actor(es) asociado(s)</p>
+                </div>
+              </button>
+            `).join('') || '<p class="muted">No hay personajes cargados.</p>'}
+          </section>
         </section>
       `;
+      document.getElementById('indiceSearchInput')?.addEventListener('input', (event) => {
+        state.indiceSearch = event.target.value;
+        renderIndiceView();
+      });
       viewIndice.querySelectorAll('[data-open-character]').forEach((btn) => {
-        btn.addEventListener('click', () => openCharacterProfile(btn.dataset.openCharacter));
+        btn.addEventListener('click', () => {
+          state.indiceCharacterFocus = btn.dataset.openCharacter;
+          renderIndiceView();
+        });
       });
     }
 
