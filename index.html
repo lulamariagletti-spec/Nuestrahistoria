@@ -458,6 +458,61 @@
       text-transform: uppercase;
     }
 
+    .completion-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, .28);
+      font-size: .68rem;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .completion-badge--incomplete {
+      background: rgba(255, 133, 133, .12);
+      color: #ffd8d8;
+      border-color: rgba(255, 133, 133, .35);
+    }
+
+    .completion-badge--advanced {
+      background: rgba(255, 217, 121, .14);
+      color: #fff1c9;
+      border-color: rgba(255, 217, 121, .35);
+    }
+
+    .completion-badge--complete {
+      background: rgba(131, 244, 188, .14);
+      color: #dbffe8;
+      border-color: rgba(131, 244, 188, .4);
+    }
+
+    .completion-track {
+      display: block;
+      width: 100%;
+      height: 7px;
+      margin-top: 6px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, .14);
+      border: 1px solid rgba(255,255,255,.2);
+    }
+
+    .completion-fill {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      transition: width .3s ease;
+    }
+
+    .completion-fill--incomplete { background: linear-gradient(90deg, #ff7f7f, #ff5252); }
+    .completion-fill--advanced { background: linear-gradient(90deg, #ffd36c, #ffb703); }
+    .completion-fill--complete { background: linear-gradient(90deg, #52f09f, #00c977); }
+
     .card {
       background: linear-gradient(158deg, var(--panel), var(--panel-2));
       border: 1px solid var(--line);
@@ -1201,15 +1256,47 @@
       return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&autoplay=${autoplay}&enablejsapi=1`;
     }
 
+    function hasGreetingVideo(video) {
+      return Boolean(getYoutubeId(video?.url_youtube || ''));
+    }
+
     function groupByUniverse() {
-      return VIDEOS.reduce((acc, item) => {
+      const grouped = VIDEOS.reduce((acc, item) => {
         const universes = Array.isArray(item.universo) ? item.universo : [item.universo];
         universes.filter(Boolean).forEach((name) => {
-          acc[name] = acc[name] || [];
-          acc[name].push(item);
+          if (!acc[name]) {
+            acc[name] = {
+              videos: [],
+              characters: new Set(),
+              unlockedCharacters: new Set()
+            };
+          }
+          acc[name].videos.push(item);
+          const character = String(item.personaje || '').trim();
+          if (character) {
+            acc[name].characters.add(character);
+            if (hasGreetingVideo(item)) acc[name].unlockedCharacters.add(character);
+          }
         });
         return acc;
       }, {});
+      return Object.fromEntries(
+        Object.entries(grouped).map(([name, data]) => {
+          const totalCharacters = data.characters.size;
+          const unlocked = data.unlockedCharacters.size;
+          const completion = totalCharacters ? Math.round((unlocked / totalCharacters) * 100) : 0;
+          let state = 'incomplete';
+          if (completion === 100 && totalCharacters > 0) state = 'complete';
+          else if (completion > 0) state = 'advanced';
+          return [name, {
+            videos: data.videos,
+            totalCharacters,
+            unlockedCharacters: unlocked,
+            completion,
+            state
+          }];
+        })
+      );
     }
 
     function normalizeEntityName(name) {
@@ -1812,7 +1899,7 @@
         state.universeNodes.push({
           id: cssSafe(firstName),
           name: firstName,
-          cover: getSafeUniverseCover(firstName, getUniverseCover(universeMap[firstName])),
+          cover: getSafeUniverseCover(firstName, getUniverseCover(universeMap[firstName]?.videos || [])),
           x: Math.round(state.mapCanvas.width / 2),
           y: Math.round(state.mapCanvas.height / 2),
           neighbors: [],
@@ -1843,7 +1930,7 @@
         state.universeNodes.push({
           id: cssSafe(name),
           name,
-          cover: getSafeUniverseCover(name, getUniverseCover(universeMap[name])),
+          cover: getSafeUniverseCover(name, getUniverseCover(universeMap[name]?.videos || [])),
           x: point.x,
           y: point.y,
           neighbors: point.anchorId ? [point.anchorId] : [],
@@ -1859,7 +1946,7 @@
       });
       state.universeNodes.forEach(node => {
         if (!node.cover && universeMap[node.name]) {
-          node.cover = getSafeUniverseCover(node.name, getUniverseCover(universeMap[node.name]));
+          node.cover = getSafeUniverseCover(node.name, getUniverseCover(universeMap[node.name]?.videos || []));
         } else if (!node.cover) {
           node.cover = createPlaceholderCover(node.name);
         }
@@ -1871,7 +1958,7 @@
       const universes = groupByUniverse();
       ensureUniverseNodes();
       const nodesMarkup = state.universeNodes.map(node => {
-        const videos = universes[node.name] || [];
+        const universeData = universes[node.name] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
         const floatDelay = ((Math.abs(hashCode(node.id)) % 24) / 10).toFixed(1);
         return `
           <button class="universe-node" data-node-id="${node.id}" data-open="${node.name}" style="left:${node.x - NODE_HALF_WIDTH}px; top:${node.y - NODE_HALF_HEIGHT}px; border-radius:${node.shape}; --float-delay:-${floatDelay}s;">
@@ -1880,7 +1967,13 @@
             <span class="cover-fallback">Portada no disponible</span>
             <span class="node-info">
               <h3>${node.name}</h3>
-              <p>${videos.length} videos</p>
+              <p>${universeData.unlockedCharacters}/${universeData.totalCharacters} personajes</p>
+              <span class="completion-badge completion-badge--${universeData.state}">
+                ${universeData.state === 'complete' ? 'Completo' : universeData.state === 'advanced' ? 'Avanzado' : 'Incompleto'}
+              </span>
+              <span class="completion-track" aria-hidden="true">
+                <span class="completion-fill completion-fill--${universeData.state}" style="width:${universeData.completion}%;"></span>
+              </span>
             </span>
           </button>
         `;
@@ -2102,6 +2195,8 @@
 
     function renderUniverseView() {
       const videos = getUniverseVideos();
+      const universeMap = groupByUniverse();
+      const universeData = universeMap[state.universe] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
       const rarezas = ['Común', 'Raro', 'Épico', 'Legendario'];
       const filtered = getFilteredUniverseVideos().filter((video) => {
         const personaje = (video.personaje || '').toLowerCase();
@@ -2119,7 +2214,13 @@
             <img src="${headerCover}" alt="Portada de ${state.universe}">
             <div>
               <h2 class="section-title">${state.universe || 'Universo'}</h2>
-              <p class="section-subtitle">${videos.length} videos en total · ${new Set(videos.map(v => v.personaje)).size} personajes.</p>
+              <p class="section-subtitle">${videos.length} videos en total · ${universeData.unlockedCharacters}/${universeData.totalCharacters} personajes desbloqueados.</p>
+              <span class="completion-badge completion-badge--${universeData.state}">
+                ${universeData.state === 'complete' ? 'Completo' : universeData.state === 'advanced' ? 'Avanzado' : 'Incompleto'} · ${universeData.completion}%
+              </span>
+              <span class="completion-track" aria-hidden="true">
+                <span class="completion-fill completion-fill--${universeData.state}" style="width:${universeData.completion}%;"></span>
+              </span>
             </div>
           </div>
           <div class="universe-controls">
@@ -2565,11 +2666,8 @@
 
     function renderAchievementsView() {
       const universeMap = groupByUniverse();
-      const universeCompleted = Object.values(universeMap).some(list => {
-        const uniq = new Set(list.map(v => v.personaje)).size;
-        return uniq >= 3;
-      });
-      const tenSameUniverse = Object.values(universeMap).some(list => new Set(list.map(v => v.personaje)).size >= 10);
+      const universeCompleted = Object.values(universeMap).some(data => data.totalCharacters >= 3);
+      const tenSameUniverse = Object.values(universeMap).some(data => data.totalCharacters >= 10);
       const fiveLegendary = VIDEOS.filter(v => v.rareza === 'Legendario').length >= 5;
 
       const achievements = [
