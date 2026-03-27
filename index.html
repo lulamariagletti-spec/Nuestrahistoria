@@ -3667,6 +3667,11 @@
       const formData = new FormData(formEl);
       const characterName = String(formData.get('characterName') || '').trim();
       const selectedUniverse = String(formData.get('characterUniverse') || '').trim();
+      const draftActorInput = formEl.querySelector('#draftActorInput');
+      if (draftActorInput && String(draftActorInput.value || '').trim()) {
+        addDraftActorFromInput(draftActorInput.value);
+        draftActorInput.value = '';
+      }
       if (!characterName) {
         state.draftCharacterFeedback = 'Debes ingresar el nombre del personaje.';
         renderIndiceView();
@@ -3684,7 +3689,12 @@
         renderIndiceView();
         return;
       }
-      const actorNames = state.draftCharacterActors.length ? state.draftCharacterActors : ['Sin actor'];
+      if (!state.draftCharacterActors.length) {
+        state.draftCharacterFeedback = 'Debes agregar al menos un actor de doblaje.';
+        renderIndiceView();
+        return;
+      }
+      const actorNames = [...state.draftCharacterActors];
       const actorMap = new Map(collectionModel.actors.map(item => [normalizeEntityName(item.name), item]));
       const characterMap = new Map(collectionModel.characters.map(item => [normalizeEntityName(item.name), item]));
       const universeMap = new Map(collectionModel.universes.map(item => [normalizeEntityName(item.name), item]));
