@@ -2120,6 +2120,10 @@
     }
 
     function getCharacterNameById(characterId) {
+      if (!characterId) return '';
+      const modelCharacter = (collectionModel.characters || [])
+        .find(item => getCharacterIdByName(item.name) === characterId);
+      if (modelCharacter?.name) return modelCharacter.name;
       return [...new Set(VIDEOS.map(v => String(v.personaje || '').trim()).filter(Boolean))]
         .find(name => getCharacterIdByName(name) === characterId) || '';
     }
@@ -3577,6 +3581,17 @@
 
     function getCharactersForIndice(searchTerm = '') {
       const grouped = new Map();
+      (collectionModel.characters || []).forEach((character) => {
+        const characterName = String(character?.name || 'Sin personaje').trim() || 'Sin personaje';
+        const normalized = normalizeName(characterName);
+        if (!grouped.has(normalized)) {
+          grouped.set(normalized, {
+            name: characterName,
+            versions: [],
+            coverVideo: null
+          });
+        }
+      });
       VIDEOS.forEach((video) => {
         const characterName = String(video.personaje || 'Sin personaje').trim() || 'Sin personaje';
         const normalized = normalizeName(characterName);
@@ -4060,6 +4075,12 @@
         }
         const current = state.blockedCharactersByActor[actor] || [];
         state.blockedCharactersByActor[actor] = [...new Set([...current, characterName])];
+        const actorMap = new Map(collectionModel.actors.map(item => [normalizeEntityName(item.name), item]));
+        const characterMap = new Map(collectionModel.characters.map(item => [normalizeEntityName(item.name), item]));
+        const actorEntity = getOrCreateActor(collectionModel, actor, actorMap);
+        const characterEntity = getOrCreateCharacter(collectionModel, characterName, characterMap);
+        linkActorCharacter(actorEntity.id, characterEntity.id, collectionModel);
+        saveCollectionModel();
         saveBlockedCharacters();
         if (state.view === 'collection') renderCollectionView();
         renderActoresView();
