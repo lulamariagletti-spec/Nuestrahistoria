@@ -3685,11 +3685,8 @@
         renderIndiceView();
         return;
       }
-      const normalizedCharacter = normalizeEntityName(characterName);
-      const alreadyExistsInVideos = VIDEOS.some(video => normalizeEntityName(video.personaje || '') === normalizedCharacter);
-      const alreadyExistsInModel = (collectionModel.characters || [])
-        .some(character => normalizeEntityName(character.name || '') === normalizedCharacter);
-      const alreadyExists = alreadyExistsInVideos || alreadyExistsInModel;
+      const normalizedCharacter = normalizeName(characterName);
+      const alreadyExists = VIDEOS.some(video => normalizeName(video.personaje || '') === normalizedCharacter);
       if (alreadyExists) {
         state.draftCharacterFeedback = 'Ese personaje ya existe en el índice.';
         renderIndiceView();
@@ -3701,10 +3698,9 @@
         return;
       }
       const actorNames = [...state.draftCharacterActors];
-      const actorNameMap = new Map((collectionModel.actors || [])
-        .map(item => [normalizeEntityName(item.name), item.name]));
-      const universeNameMap = new Map((collectionModel.universes || [])
-        .map(item => [normalizeEntityName(item.name), item.name]));
+      const actorMap = new Map(collectionModel.actors.map(item => [normalizeEntityName(item.name), item]));
+      const characterMap = new Map(collectionModel.characters.map(item => [normalizeEntityName(item.name), item]));
+      const universeMap = new Map(collectionModel.universes.map(item => [normalizeEntityName(item.name), item]));
       actorNames.forEach((actorName, idx) => {
         const actor = getOrCreateActor(collectionModel, actorName, actorMap);
         const character = getOrCreateCharacter(collectionModel, characterName, characterMap);
@@ -3714,22 +3710,22 @@
         VIDEOS.push({
           id: `video-${Date.now()}-${idx}`,
           titulo: `Registro de ${characterName}`,
-          universo: [canonicalUniverse],
+          universo: [selectedUniverse],
           personaje: characterName,
-          actor_de_doblaje: canonicalActorName,
+          actor_de_doblaje: actor.name,
           url_youtube: '',
           rareza: 'Común',
           thumbnail: createPlaceholderCover(characterName)
         });
       });
-      saveVideos();
-      groupByUniverse();
       ensureUniverseNodes();
+      saveCollectionModel();
+      saveVideos();
       state.showAddCharacterForm = false;
       state.draftCharacterActors = [];
       state.draftCharacterFeedback = 'Personaje agregado correctamente.';
       renderIndiceView();
-      renderActoresView();
+      if (state.actorFocus) renderActoresView();
     }
 
     function renderIndiceView() {
