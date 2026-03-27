@@ -1551,6 +1551,69 @@
       font-size: .75rem;
       line-height: 1.15;
     }
+    .indice-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .add-character-form {
+      border: 1px solid rgba(118, 208, 255, .38);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(8, 20, 42, .72);
+      display: grid;
+      gap: 10px;
+    }
+    .chip-input-shell {
+      min-height: 44px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--control-border);
+      border-radius: 12px;
+      background: var(--control-bg);
+      box-shadow: var(--control-shadow);
+    }
+    .chip-input-shell:focus-within {
+      border-color: var(--focus);
+      box-shadow: var(--focus-glow), var(--control-shadow);
+    }
+    .actor-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(112, 234, 255, .5);
+      background: rgba(22, 70, 104, .7);
+      color: #d8f7ff;
+      padding: 3px 10px;
+      font-size: .85rem;
+      line-height: 1.2;
+    }
+    .actor-chip button {
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      padding: 0;
+      min-height: auto;
+      color: #b8ecff;
+      cursor: pointer;
+      font-size: .95rem;
+      line-height: 1;
+    }
+    .chip-input-shell input {
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      padding: 0;
+      min-height: auto;
+      flex: 1;
+      min-width: 180px;
+    }
     .character-actors-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
@@ -1766,7 +1829,10 @@
       blockedCharactersByActor: {},
       characterProfileId: null,
       indiceSearch: '',
-      indiceCharacterFocus: null
+      indiceCharacterFocus: null,
+      showAddCharacterForm: false,
+      draftCharacterActors: [],
+      draftCharacterFeedback: ''
     };
     const UNIVERSES_STORAGE_KEY = 'universes_map_v1';
     const VIDEOS_STORAGE_KEY = 'videos_collection_v1';
@@ -3493,6 +3559,88 @@
         .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
     }
 
+    function getUniverseOptionsForCharacterForm() {
+      const source = [...new Set([
+        ...Object.keys(groupByUniverse()),
+        ...state.universeNodes.map(node => node.name)
+      ])].map(name => String(name || '').trim()).filter(Boolean);
+      return source.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    }
+
+    function addDraftActorFromInput(rawName) {
+      const actorName = String(rawName || '').trim();
+      if (!actorName) return false;
+      const normalized = normalizeName(actorName);
+      const existingDraft = state.draftCharacterActors.some(item => normalizeName(item) === normalized);
+      if (existingDraft) return false;
+      const existingActor = (collectionModel.actors || []).find(item => normalizeName(item.name) === normalized);
+      const canonicalName = existingActor?.name || actorName;
+      state.draftCharacterActors = [...state.draftCharacterActors, canonicalName];
+      return true;
+    }
+
+    function submitNewCharacterForm(formEl) {
+      const formData = new FormData(formEl);
+      const characterName = String(formData.get('characterName') || '').trim();
+      const selectedUniverse = String(formData.get('characterUniverse') || '').trim();
+      if (!characterName) {
+        state.draftCharacterFeedback = 'Debes ingresar el nombre del personaje.';
+        renderIndiceView();
+        return;
+      }
+      if (!selectedUniverse) {
+        state.draftCharacterFeedback = 'Debes seleccionar un universo existente.';
+        renderIndiceView();
+        return;
+      }
+      const normalizedCharacter = normalizeName(characterName);
+      const alreadyExists = VIDEOS.some(video => normalizeName(video.personaje || '') === normalizedCharacter);
+      if (alreadyExists) {
+        state.draftCharacterFeedback = 'Ese personaje ya existe en el índice.';
+        renderIndiceView();
+        return;
+      }
+      const actorNames = state.draftCharacterActors.length ? state.draftCharacterActors : ['Sin actor'];
+      const actorMap = new Map(collectionModel.actors.map(item => [normalizeEntityName(item.name), item]));
+      const characterMap = new Map(collectionModel.characters.map(item => [normalizeEntityName(item.name), item]));
+      const universeMap = new Map(collectionModel.universes.map(item => [normalizeEntityName(item.name), item]));
+      actorNames.forEach((actorName, idx) => {
+        const actor = getOrCreateActor(collectionModel, actorName, actorMap);
+        const character = getOrCreateCharacter(collectionModel, characterName, characterMap);
+        const universe = getOrCreateUniverse(collectionModel, selectedUniverse, universeMap);
+        linkActorCharacter(actor.id, character.id, collectionModel);
+        linkCharacterUniverse(character.id, universe.id, collectionModel);
+        addOrUpdateVideoModelEntry({
+          id: createModelId('video', `${normalizeName(characterName)}-${normalizeName(actorName)}-${Date.now()}-${idx}`),
+          title: `Registro de ${characterName}`,
+          youtubeUrl: '',
+          thumbnail: createPlaceholderCover(characterName),
+          rarity: 'Común',
+          actorId: actor.id,
+          characterId: character.id,
+          universeIds: [universe.id]
+        }, collectionModel);
+        VIDEOS.push({
+          id: `video-${Date.now()}-${idx}`,
+          titulo: `Registro de ${characterName}`,
+          universo: [selectedUniverse],
+          personaje: characterName,
+          actor_de_doblaje: actor.name,
+          url_youtube: '',
+          rareza: 'Común',
+          thumbnail: createPlaceholderCover(characterName)
+        });
+      });
+      ensureUniverseNodes();
+      saveCollectionModel();
+      saveVideos();
+      state.showAddCharacterForm = false;
+      state.draftCharacterActors = [];
+      state.draftCharacterFeedback = 'Personaje agregado correctamente.';
+      renderIndiceView();
+      if (state.actorFocus) renderActoresView();
+    }
+
     function renderIndiceView() {
       const focusedCharacter = state.indiceCharacterFocus;
       if (focusedCharacter) {
@@ -3543,9 +3691,42 @@
       }
 
       const indexItems = getCharactersForIndice(state.indiceSearch);
+      const universeOptions = getUniverseOptionsForCharacterForm();
       viewIndice.innerHTML = `
         <section class="mock-shell">
-          <h2>Índice de Personajes</h2>
+          <div class="indice-toolbar">
+            <h2 style="margin:0;">Índice de Personajes</h2>
+            <button id="toggleAddCharacterForm" class="neon-btn">${state.showAddCharacterForm ? 'Cerrar formulario' : 'Agregar personaje'}</button>
+          </div>
+          ${state.showAddCharacterForm ? `
+            <form id="addCharacterForm" class="add-character-form">
+              <label>Nombre del personaje
+                <input type="text" name="characterName" placeholder="Ej. Homero Simpson" required>
+              </label>
+              <label>Actores de doblaje
+                <div class="chip-input-shell" id="actorChipInputShell">
+                  ${state.draftCharacterActors.map((actorName, index) => `
+                    <span class="actor-chip">
+                      <span>${actorName}</span>
+                      <button type="button" aria-label="Quitar actor ${actorName}" data-remove-draft-actor="${index}">×</button>
+                    </span>
+                  `).join('')}
+                  <input id="draftActorInput" type="text" placeholder="Escribe un actor y presiona coma">
+                </div>
+              </label>
+              <label>Universo
+                <select name="characterUniverse" required ${universeOptions.length ? '' : 'disabled'}>
+                  <option value="">Selecciona un universo</option>
+                  ${universeOptions.map((name) => `<option value="${name}">${name}</option>`).join('')}
+                </select>
+              </label>
+              <p id="addCharacterFeedback" class="inline-feedback" aria-live="polite">${state.draftCharacterFeedback || ''}</p>
+              <div class="actions">
+                <button type="submit" class="neon-btn neon-btn--primary" ${universeOptions.length ? '' : 'disabled'}>Guardar personaje</button>
+              </div>
+              ${universeOptions.length ? '' : '<p class="muted">Primero debes crear al menos un universo para poder agregar personajes.</p>'}
+            </form>
+          ` : ''}
           <input id="indiceSearchInput" type="search" value="${state.indiceSearch}" placeholder="Filtrar personaje..." aria-label="Buscar personaje en índice">
           <section class="characters-gallery">
             ${indexItems.map(item => `
@@ -3563,6 +3744,43 @@
       document.getElementById('indiceSearchInput')?.addEventListener('input', (event) => {
         state.indiceSearch = event.target.value;
         renderIndiceView();
+      });
+      document.getElementById('toggleAddCharacterForm')?.addEventListener('click', () => {
+        state.showAddCharacterForm = !state.showAddCharacterForm;
+        state.draftCharacterFeedback = '';
+        if (!state.showAddCharacterForm) state.draftCharacterActors = [];
+        renderIndiceView();
+      });
+      document.getElementById('addCharacterForm')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitNewCharacterForm(event.currentTarget);
+      });
+      const draftActorInput = document.getElementById('draftActorInput');
+      const flushDraftActor = () => {
+        if (!draftActorInput) return false;
+        const added = addDraftActorFromInput(draftActorInput.value);
+        draftActorInput.value = '';
+        if (added) state.draftCharacterFeedback = '';
+        return added;
+      };
+      draftActorInput?.addEventListener('keydown', (event) => {
+        if (event.key !== ',') return;
+        event.preventDefault();
+        const added = flushDraftActor();
+        if (added) renderIndiceView();
+      });
+      draftActorInput?.addEventListener('blur', () => {
+        const added = flushDraftActor();
+        if (added) renderIndiceView();
+      });
+      viewIndice.querySelectorAll('[data-remove-draft-actor]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const index = Number(btn.dataset.removeDraftActor);
+          if (!Number.isNaN(index)) {
+            state.draftCharacterActors = state.draftCharacterActors.filter((_, idx) => idx !== index);
+            renderIndiceView();
+          }
+        });
       });
       viewIndice.querySelectorAll('[data-open-character]').forEach((btn) => {
         btn.addEventListener('click', () => {
