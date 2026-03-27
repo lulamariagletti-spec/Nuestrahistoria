@@ -398,7 +398,6 @@
       cursor: crosshair;
       user-select: none;
     }
-    .universe-map-shell.is-dragging { cursor: grabbing; }
 
     #universeMapCanvas {
       position: relative;
@@ -455,7 +454,34 @@
       transition: transform .2s ease;
       will-change: transform;
     }
-    .universe-map-shell.is-dragging .map-world { transition: none; }
+
+    .map-sliders {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      z-index: 9;
+      width: min(280px, calc(100% - 28px));
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(130, 190, 255, .4);
+      background: rgba(8, 18, 36, .9);
+      box-shadow: 0 8px 22px rgba(1, 6, 20, .48);
+      display: grid;
+      gap: 8px;
+    }
+
+    .map-sliders label {
+      font-size: .8rem;
+      color: #d7e9ff;
+      display: grid;
+      gap: 4px;
+    }
+
+    .map-sliders input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--accent);
+    }
 
     .universe-node {
       --w: 220px;
@@ -622,64 +648,6 @@
       font-family: "Comic Sans MS", "Chalkboard SE", "Marker Felt", "Trebuchet MS", cursive, sans-serif;
     }
 
-    .map-popup {
-      position: absolute;
-      width: min(300px, 88vw);
-      border-radius: 16px;
-      border: 1px solid rgba(140, 186, 255, .45);
-      background: rgba(16, 26, 50, .98);
-      box-shadow: var(--shadow);
-      padding: 14px;
-      z-index: 8;
-      animation: popupIn .18s ease;
-    }
-
-    .map-popup form { display: grid; gap: 10px; }
-    .map-popup label { display: grid; gap: 4px; color: #d8e8ff; font-size: .85rem; }
-    .map-popup input {
-      border-color: rgba(114, 203, 255, .42);
-      background: linear-gradient(160deg, rgba(9, 20, 42, .96), rgba(20, 39, 71, .95));
-      color: #e5f7ff;
-      border-radius: 10px;
-      padding: 9px 10px;
-      font: inherit;
-    }
-    .cover-mode {
-      display: inline-grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      padding: 4px;
-      border-radius: 12px;
-      border: 1px solid rgba(147, 175, 255, .35);
-      background: rgba(255,255,255,.06);
-    }
-    .cover-mode button {
-      padding: 8px 10px;
-      border-radius: 9px;
-      border-color: transparent;
-      background: rgba(255,255,255,.08);
-      color: #e5eeff;
-      font-weight: 700;
-    }
-    .cover-mode button.active {
-      color: #dcfbff;
-      background: rgba(21, 116, 162, .72);
-      box-shadow: none;
-      border-color: transparent;
-    }
-    .cover-input-group[hidden] { display: none; }
-    .map-popup .popup-feedback { min-height: 16px; font-size: .8rem; color: #ffd2d2; margin: 0; }
-    .map-popup button[type="submit"] {
-      background: var(--accent);
-      color: #fff;
-      border-color: color-mix(in srgb, var(--accent) 68%, white);
-    }
-    .map-popup button[type="submit"]:hover { background: var(--accent-hover); }
-
-    @keyframes popupIn {
-      from { opacity: 0; transform: translateY(6px) scale(.96); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
 
     .universe-node p {
       margin: 4px 0 0;
@@ -1786,12 +1754,7 @@
         zoom: 1,
         minZoom: 0.6,
         maxZoom: 2.8,
-        nodeScale: 1,
-        isDragging: false,
-        dragMoved: false,
-        suppressClickUntil: 0,
-        lastPointerX: 0,
-        lastPointerY: 0
+        nodeScale: 1
       },
       blockedCharactersByActor: {},
       characterProfileId: null,
@@ -1803,7 +1766,6 @@
     const COLLECTION_MODEL_STORAGE_KEY = 'collection_model_v1';
     const BLOCKED_CHARACTERS_STORAGE_KEY = 'blocked_characters_by_actor_v1';
     const CLOUD_STORAGE_PATH = 'univoicerData/main';
-    const MAX_LOCAL_IMAGE_BYTES = 2 * 1024 * 1024;
     const NODE_HALF_WIDTH = 110;
     const NODE_HALF_HEIGHT = 93;
     let firebaseDb = null;
@@ -2089,15 +2051,6 @@
       } catch (_) {
         throw new Error('La URL de portada no es válida');
       }
-    }
-
-    function fileToDataUrl(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('No fue posible leer la imagen local.'));
-        reader.readAsDataURL(file);
-      });
     }
 
     function saveUniverseNodes() {
@@ -2618,6 +2571,14 @@
               ${nodesMarkup}
             </div>
           </div>
+          <div class="map-sliders">
+            <label>Plano X
+              <input id="mapSliderX" type="range" min="0" max="100" value="50" step="1" aria-label="Desplazar plano en eje X">
+            </label>
+            <label>Plano Y
+              <input id="mapSliderY" type="range" min="0" max="100" value="50" step="1" aria-label="Desplazar plano en eje Y">
+            </label>
+          </div>
         </div>
       `;
 
@@ -2627,10 +2588,22 @@
 
       const mapShell = viewMap.querySelector('.universe-map-shell');
 
-      const centerMapCamera = () => {
-        if (!mapShell) return;
-        state.mapCamera.x = (mapShell.clientWidth / 2) - ((state.mapCanvas.width / 2) * state.mapCamera.zoom);
-        state.mapCamera.y = (mapShell.clientHeight / 2) - ((state.mapCanvas.height / 2) * state.mapCamera.zoom);
+      const sliderX = document.getElementById('mapSliderX');
+      const sliderY = document.getElementById('mapSliderY');
+
+      const updateMapPositionFromSliders = () => {
+        if (!mapShell || !sliderX || !sliderY) return;
+        const viewportW = mapShell.clientWidth;
+        const viewportH = mapShell.clientHeight;
+        const worldW = state.mapCanvas.width * state.mapCamera.zoom;
+        const worldH = state.mapCanvas.height * state.mapCamera.zoom;
+        const rangeX = Math.max(0, worldW - viewportW);
+        const rangeY = Math.max(0, worldH - viewportH);
+        const percentX = Number(sliderX.value || 0) / 100;
+        const percentY = Number(sliderY.value || 0) / 100;
+        state.mapCamera.x = -Math.round(rangeX * percentX);
+        state.mapCamera.y = -Math.round(rangeY * percentY);
+        applyMapCameraTransform(mapWorld);
       };
 
       const syncMapCanvasSize = () => {
@@ -2644,117 +2617,9 @@
         state.mapCamera.minZoom = getFitZoom(mapShell.clientWidth, mapShell.clientHeight);
         state.mapCamera.maxZoom = Math.max(state.mapCamera.minZoom + 0.5, 3.2);
         state.mapCamera.zoom = Math.max(state.mapCamera.minZoom, Math.min(state.mapCamera.zoom, state.mapCamera.maxZoom));
-        centerMapCamera();
-        applyMapCameraTransform(mapWorld);
+        updateMapPositionFromSliders();
       };
       syncMapCanvasSize();
-
-      const closePopup = () => {
-        const popup = document.getElementById('mapPopup');
-        popup?.remove();
-      };
-
-      const openPopupAt = (x, y) => {
-        closePopup();
-        const popup = document.createElement('div');
-        popup.id = 'mapPopup';
-        popup.className = 'map-popup';
-        popup.style.left = `${Math.max(8, Math.min(x + 8, state.mapCanvas.width - 298))}px`;
-        popup.style.top = `${Math.max(8, Math.min(y + 8, state.mapCanvas.height - 250))}px`;
-        popup.innerHTML = `
-          <form id="mapCreateForm">
-            <label>Nombre del universo
-              <input type="text" name="nombreUniverso" maxlength="80" required placeholder="Ej. One Piece">
-            </label>
-            <label>Portada</label>
-            <div class="cover-mode" role="group" aria-label="Selector de portada">
-              <button type="button" data-cover-mode="url" class="active">URL</button>
-              <button type="button" data-cover-mode="file">+</button>
-            </div>
-            <div class="cover-input-group" data-cover-input="url">
-              <input type="url" name="portadaUrl" placeholder="https://...">
-            </div>
-            <div class="cover-input-group" data-cover-input="file" hidden>
-              <input type="file" name="portadaArchivo" accept="image/*">
-            </div>
-            <button type="submit" class="neon-btn neon-btn--primary">Crear Universo</button>
-            <p class="popup-feedback" id="popupFeedback" aria-live="polite"></p>
-          </form>
-        `;
-        popup.addEventListener('click', (event) => event.stopPropagation());
-        mapCanvas.appendChild(popup);
-        setTimeout(() => document.addEventListener('click', closePopup, { once: true }), 0);
-
-        const form = popup.querySelector('#mapCreateForm');
-        const feedback = popup.querySelector('#popupFeedback');
-        let coverMode = 'url';
-        popup.querySelectorAll('[data-cover-mode]').forEach((modeBtn) => {
-          modeBtn.addEventListener('click', () => {
-            coverMode = modeBtn.dataset.coverMode || 'url';
-            popup.querySelectorAll('[data-cover-mode]').forEach(btn => btn.classList.toggle('active', btn === modeBtn));
-            popup.querySelectorAll('[data-cover-input]').forEach(group => {
-              group.hidden = group.dataset.coverInput !== coverMode;
-            });
-          });
-        });
-
-        form?.addEventListener('submit', async (event) => {
-          event.preventDefault();
-          if (!feedback) return;
-          feedback.style.color = '#ffd2d2';
-          feedback.textContent = '';
-
-          const formData = new FormData(form);
-          const name = String(formData.get('nombreUniverso') || '').trim();
-          if (!name) {
-            feedback.textContent = 'El nombre es obligatorio.';
-            return;
-          }
-
-          const normalized = normalizeUniverseName(name);
-          const duplicate = state.universeNodes.some(node => normalizeUniverseName(node.name) === normalized);
-          if (duplicate) {
-            feedback.textContent = 'Ya existe un universo con ese nombre.';
-            return;
-          }
-
-          const file = formData.get('portadaArchivo');
-          const urlInput = String(formData.get('portadaUrl') || '');
-          let cover = createPlaceholderCover(name);
-          try {
-            if (coverMode === 'file' && file instanceof File && file.size > 0) {
-              if (!file.type.startsWith('image/')) throw new Error('El archivo seleccionado no es una imagen.');
-              if (file.size > MAX_LOCAL_IMAGE_BYTES) throw new Error('La imagen supera el límite de 2MB.');
-              cover = await fileToDataUrl(file);
-            } else if (coverMode === 'url' && urlInput.trim()) {
-              cover = validateCoverUrl(urlInput);
-            }
-          } catch (err) {
-            feedback.textContent = err.message || 'No se pudo procesar la portada.';
-            return;
-          }
-
-          const worldX = (x - state.mapCamera.x) / state.mapCamera.zoom;
-          const worldY = (y - state.mapCamera.y) / state.mapCamera.zoom;
-          const logicalX = Math.round(worldX - (state.mapCanvas.width / 2));
-          const logicalY = Math.round(worldY - (state.mapCanvas.height / 2));
-          const adjusted = resolveNodeCollision(logicalX, logicalY, state.universeNodes);
-          state.universeNodes.push({
-            id: cssSafe(`${name}-${Date.now()}`),
-            name,
-            cover,
-            x: adjusted.x,
-            y: adjusted.y,
-            neighbors: [],
-            shape: createNodeShape(hashCode(name)),
-            isNew: true
-          });
-          recenterUniverseNodes();
-          saveUniverseNodes();
-          closePopup();
-          renderMapView();
-        });
-      };
 
       viewMap.querySelectorAll('.universe-node').forEach(nodeEl => {
         const coverEl = nodeEl.querySelector('.universe-cover');
@@ -2775,61 +2640,44 @@
       });
 
       mapCanvas.addEventListener('click', (event) => {
-        if (Date.now() < state.mapCamera.suppressClickUntil || event.target.closest('.universe-node')) return;
+        if (event.target.closest('.universe-node')) return;
         event.stopPropagation();
-        const rect = mapCanvas.getBoundingClientRect();
-        openPopupAt(event.clientX - rect.left, event.clientY - rect.top);
-      });
-
-      mapShell.addEventListener('pointerdown', (event) => {
-        if (event.button !== 0 || event.target.closest('.universe-node') || event.target.closest('.map-popup')) return;
-        state.mapCamera.isDragging = true;
-        state.mapCamera.dragMoved = false;
-        state.mapCamera.lastPointerX = event.clientX;
-        state.mapCamera.lastPointerY = event.clientY;
-        mapShell.setPointerCapture(event.pointerId);
-        mapShell.classList.add('is-dragging');
-      });
-
-      mapShell.addEventListener('pointermove', (event) => {
-        if (!state.mapCamera.isDragging) return;
-        const dx = event.clientX - state.mapCamera.lastPointerX;
-        const dy = event.clientY - state.mapCamera.lastPointerY;
-        if (Math.abs(dx) + Math.abs(dy) > 2) state.mapCamera.dragMoved = true;
-        state.mapCamera.x += dx;
-        state.mapCamera.y += dy;
-        state.mapCamera.lastPointerX = event.clientX;
-        state.mapCamera.lastPointerY = event.clientY;
-        applyMapCameraTransform(mapWorld);
-      });
-
-      const endDrag = () => {
-        if (state.mapCamera.dragMoved) {
-          state.mapCamera.suppressClickUntil = Date.now() + 160;
+        const name = prompt('Nombre del universo nuevo:', '');
+        if (name === null) return;
+        const cleanName = String(name || '').trim();
+        if (!cleanName) return;
+        const normalized = normalizeUniverseName(cleanName);
+        const duplicate = state.universeNodes.some(node => normalizeUniverseName(node.name) === normalized);
+        if (duplicate) {
+          alert('Ya existe un universo con ese nombre.');
+          return;
         }
-        state.mapCamera.isDragging = false;
-        state.mapCamera.dragMoved = false;
-        mapShell.classList.remove('is-dragging');
-      };
-      mapShell.addEventListener('pointerup', endDrag);
-      mapShell.addEventListener('pointercancel', endDrag);
 
-      mapShell.addEventListener('wheel', (event) => {
-        event.preventDefault();
-        const rect = mapShell.getBoundingClientRect();
-        const px = event.clientX - rect.left;
-        const py = event.clientY - rect.top;
-        const wheelStep = event.deltaY < 0 ? 1.1 : 0.9;
-        const oldZoom = state.mapCamera.zoom;
-        const nextZoom = Math.max(state.mapCamera.minZoom, Math.min(oldZoom * wheelStep, state.mapCamera.maxZoom));
-        if (nextZoom === oldZoom) return;
-        const worldX = (px - state.mapCamera.x) / oldZoom;
-        const worldY = (py - state.mapCamera.y) / oldZoom;
-        state.mapCamera.zoom = nextZoom;
-        state.mapCamera.x = px - (worldX * nextZoom);
-        state.mapCamera.y = py - (worldY * nextZoom);
-        applyMapCameraTransform(mapWorld);
-      }, { passive: false });
+        const rect = mapCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const worldX = (x - state.mapCamera.x) / state.mapCamera.zoom;
+        const worldY = (y - state.mapCamera.y) / state.mapCamera.zoom;
+        const logicalX = Math.round(worldX - (state.mapCanvas.width / 2));
+        const logicalY = Math.round(worldY - (state.mapCanvas.height / 2));
+        const adjusted = resolveNodeCollision(logicalX, logicalY, state.universeNodes);
+        state.universeNodes.push({
+          id: cssSafe(`${cleanName}-${Date.now()}`),
+          name: cleanName,
+          cover: createPlaceholderCover(cleanName),
+          x: adjusted.x,
+          y: adjusted.y,
+          neighbors: [],
+          shape: createNodeShape(hashCode(cleanName)),
+          isNew: true
+        });
+        recenterUniverseNodes();
+        saveUniverseNodes();
+        renderMapView();
+      });
+
+      sliderX?.addEventListener('input', updateMapPositionFromSliders);
+      sliderY?.addEventListener('input', updateMapPositionFromSliders);
 
       state.universeNodes.forEach(node => { if (node.isNew) delete node.isNew; });
       saveUniverseNodes();
