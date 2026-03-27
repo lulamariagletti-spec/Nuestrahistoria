@@ -3682,8 +3682,11 @@
         renderIndiceView();
         return;
       }
-      const normalizedCharacter = normalizeName(characterName);
-      const alreadyExists = VIDEOS.some(video => normalizeName(video.personaje || '') === normalizedCharacter);
+      const normalizedCharacter = normalizeEntityName(characterName);
+      const alreadyExistsInVideos = VIDEOS.some(video => normalizeEntityName(video.personaje || '') === normalizedCharacter);
+      const alreadyExistsInModel = (collectionModel.characters || [])
+        .some(character => normalizeEntityName(character.name || '') === normalizedCharacter);
+      const alreadyExists = alreadyExistsInVideos || alreadyExistsInModel;
       if (alreadyExists) {
         state.draftCharacterFeedback = 'Ese personaje ya existe en el índice.';
         renderIndiceView();
@@ -3695,44 +3698,32 @@
         return;
       }
       const actorNames = [...state.draftCharacterActors];
-      const actorMap = new Map(collectionModel.actors.map(item => [normalizeEntityName(item.name), item]));
-      const characterMap = new Map(collectionModel.characters.map(item => [normalizeEntityName(item.name), item]));
-      const universeMap = new Map(collectionModel.universes.map(item => [normalizeEntityName(item.name), item]));
+      const actorNameMap = new Map((collectionModel.actors || [])
+        .map(item => [normalizeEntityName(item.name), item.name]));
+      const universeNameMap = new Map((collectionModel.universes || [])
+        .map(item => [normalizeEntityName(item.name), item.name]));
       actorNames.forEach((actorName, idx) => {
-        const actor = getOrCreateActor(collectionModel, actorName, actorMap);
-        const character = getOrCreateCharacter(collectionModel, characterName, characterMap);
-        const universe = getOrCreateUniverse(collectionModel, selectedUniverse, universeMap);
-        linkActorCharacter(actor.id, character.id, collectionModel);
-        linkCharacterUniverse(character.id, universe.id, collectionModel);
-        addOrUpdateVideoModelEntry({
-          id: createModelId('video', `${normalizeName(characterName)}-${normalizeName(actorName)}-${Date.now()}-${idx}`),
-          title: `Registro de ${characterName}`,
-          youtubeUrl: '',
-          thumbnail: createPlaceholderCover(characterName),
-          rarity: 'Común',
-          actorId: actor.id,
-          characterId: character.id,
-          universeIds: [universe.id]
-        }, collectionModel);
+        const canonicalActorName = actorNameMap.get(normalizeEntityName(actorName)) || actorName;
+        const canonicalUniverse = universeNameMap.get(normalizeEntityName(selectedUniverse)) || selectedUniverse;
         VIDEOS.push({
           id: `video-${Date.now()}-${idx}`,
           titulo: `Registro de ${characterName}`,
-          universo: [selectedUniverse],
+          universo: [canonicalUniverse],
           personaje: characterName,
-          actor_de_doblaje: actor.name,
+          actor_de_doblaje: canonicalActorName,
           url_youtube: '',
           rareza: 'Común',
           thumbnail: createPlaceholderCover(characterName)
         });
       });
-      ensureUniverseNodes();
-      saveCollectionModel();
       saveVideos();
+      groupByUniverse();
+      ensureUniverseNodes();
       state.showAddCharacterForm = false;
       state.draftCharacterActors = [];
       state.draftCharacterFeedback = 'Personaje agregado correctamente.';
       renderIndiceView();
-      if (state.actorFocus) renderActoresView();
+      renderActoresView();
     }
 
     function renderIndiceView() {
