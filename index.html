@@ -1822,6 +1822,7 @@
       actorFocus: null,
       actorDetailsExpanded: false,
       showAddForm: false,
+      universeAddMode: 'video',
       marathon: { active: false, queue: [], position: 0 },
       universeNodes: [],
       mapCanvas: { width: 1400, height: 900 },
@@ -2945,16 +2946,23 @@
             <button
               id="btn-toggle-video"
               class="neon-btn neon-btn--primary neon-action"
-              aria-expanded="${state.showAddForm ? 'true' : 'false'}"
+              aria-expanded="${state.showAddForm && state.universeAddMode === 'video' ? 'true' : 'false'}"
             >
-              ${state.showAddForm ? 'CERRAR' : 'AGREGAR VIDEO'}
+              ${state.showAddForm && state.universeAddMode === 'video' ? 'CERRAR' : 'AGREGAR VIDEO'}
+            </button>
+            <button
+              id="btn-add-blocked-character"
+              class="neon-btn neon-action"
+              aria-expanded="${state.showAddForm && state.universeAddMode === 'character' ? 'true' : 'false'}"
+            >
+              ${state.showAddForm && state.universeAddMode === 'character' ? 'CERRAR FORMULARIO' : 'AGREGAR PERSONAJE'}
             </button>
           </div>
         </section>
 
         <form id="form-agregar-video" class="add-video-form">
           <label>URL de YouTube
-            <input type="url" name="url_youtube" required placeholder="https://www.youtube.com/watch?v=...">
+            <input type="url" name="url_youtube" ${state.universeAddMode === 'video' ? 'required' : ''} placeholder="https://www.youtube.com/watch?v=...">
           </label>
           <label>Personaje (opcional)
             <input type="text" name="personaje" placeholder="Ej. Gokú">
@@ -2962,13 +2970,13 @@
           <label>Actor de doblaje (opcional)
             <input type="text" name="actor_de_doblaje" placeholder="Ej. Mario Castañeda">
           </label>
-          <label>Rareza
-            <select name="rareza">
+          <label id="videoRarityField">Rareza
+            <select name="rareza" ${state.universeAddMode === 'character' ? 'disabled' : ''}>
               ${rarezas.map(r => `<option value="${r}">${r}</option>`).join('')}
             </select>
           </label>
           <div class="actions">
-            <button type="submit" class="neon-btn neon-btn--primary">Guardar</button>
+            <button type="submit" class="neon-btn neon-btn--primary">${state.universeAddMode === 'video' ? 'Guardar video' : 'Guardar bloqueado'}</button>
             <span class="muted" id="videoFormFeedback"></span>
           </div>
         </form>
@@ -3019,16 +3027,36 @@
 
       document.getElementById('backMap').onclick = () => changeView('map');
       const btnToggleVideo = document.getElementById('btn-toggle-video');
+      const btnAddBlockedCharacter = document.getElementById('btn-add-blocked-character');
       const formAgregarVideo = document.getElementById('form-agregar-video');
       const syncVideoFormUi = () => {
         if (!btnToggleVideo || !formAgregarVideo) return;
         formAgregarVideo.style.display = state.showAddForm ? 'grid' : 'none';
-        btnToggleVideo.textContent = state.showAddForm ? 'CERRAR' : 'AGREGAR VIDEO';
-        btnToggleVideo.setAttribute('aria-expanded', state.showAddForm ? 'true' : 'false');
+        btnToggleVideo.textContent = state.showAddForm && state.universeAddMode === 'video' ? 'CERRAR' : 'AGREGAR VIDEO';
+        btnToggleVideo.setAttribute('aria-expanded', state.showAddForm && state.universeAddMode === 'video' ? 'true' : 'false');
+        if (btnAddBlockedCharacter) {
+          btnAddBlockedCharacter.textContent = state.showAddForm && state.universeAddMode === 'character' ? 'CERRAR FORMULARIO' : 'AGREGAR PERSONAJE';
+          btnAddBlockedCharacter.setAttribute('aria-expanded', state.showAddForm && state.universeAddMode === 'character' ? 'true' : 'false');
+        }
       };
       syncVideoFormUi();
       btnToggleVideo?.addEventListener('click', () => {
-        state.showAddForm = !state.showAddForm;
+        if (state.showAddForm && state.universeAddMode === 'video') {
+          state.showAddForm = false;
+        } else {
+          state.showAddForm = true;
+          state.universeAddMode = 'video';
+        }
+        syncVideoFormUi();
+        if (state.showAddForm) formAgregarVideo?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      btnAddBlockedCharacter?.addEventListener('click', () => {
+        if (state.showAddForm && state.universeAddMode === 'character') {
+          state.showAddForm = false;
+        } else {
+          state.showAddForm = true;
+          state.universeAddMode = 'character';
+        }
         syncVideoFormUi();
         if (state.showAddForm) formAgregarVideo?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -3088,6 +3116,23 @@
         event.preventDefault();
         const feedback = document.getElementById('videoFormFeedback');
         const formData = new FormData(addVideoForm);
+        const characterName = String(formData.get('personaje') || '').trim();
+        const actorName = String(formData.get('actor_de_doblaje') || '').trim();
+        if (state.universeAddMode === 'character') {
+          if (!characterName || !actorName) {
+            if (feedback) feedback.textContent = 'Para bloquear un personaje debes completar personaje y actor.';
+            return;
+          }
+          const current = state.blockedCharactersByActor[actorName] || [];
+          state.blockedCharactersByActor[actorName] = [...new Set([...current, characterName])];
+          saveBlockedCharacters();
+          if (feedback) feedback.textContent = 'Personaje agregado como bloqueado.';
+          addVideoForm.reset();
+          state.showAddForm = false;
+          renderUniverseView();
+          return;
+        }
+
         const urlInput = String(formData.get('url_youtube') || '').trim();
         const normalizedUrl = normalizeYoutubeUrl(urlInput);
         if (!normalizedUrl) {
@@ -3099,8 +3144,8 @@
         const newVideo = {
           id: `video-${Date.now()}`,
           universo: [state.universe],
-          personaje: String(formData.get('personaje') || '').trim() || 'Sin personaje',
-          actor_de_doblaje: String(formData.get('actor_de_doblaje') || '').trim() || 'Sin actor',
+          personaje: characterName || 'Sin personaje',
+          actor_de_doblaje: actorName || 'Sin actor',
           url_youtube: normalizedUrl,
           thumbnail: metadata.thumbnail,
           titulo: metadata.title,
@@ -3546,6 +3591,30 @@
         record.versions.push(video);
         if (!record.coverVideo && hasGreetingVideo(video)) record.coverVideo = video;
       });
+      Object.entries(state.blockedCharactersByActor || {}).forEach(([actorName, blockedList]) => {
+        (Array.isArray(blockedList) ? blockedList : []).forEach((characterName) => {
+          const cleanName = String(characterName || '').trim();
+          if (!cleanName) return;
+          const normalized = normalizeName(cleanName);
+          if (!grouped.has(normalized)) {
+            grouped.set(normalized, {
+              name: cleanName,
+              versions: [],
+              coverVideo: null
+            });
+          }
+          const record = grouped.get(normalized);
+          if (!record.versions.some(item => normalizeName(item.actor_de_doblaje || '') === normalizeName(actorName))) {
+            record.versions.push({
+              id: `blocked-${cssSafe(actorName)}-${cssSafe(cleanName)}`,
+              personaje: cleanName,
+              actor_de_doblaje: actorName,
+              url_youtube: '',
+              universo: []
+            });
+          }
+        });
+      });
       const normalizedSearch = normalizeName(searchTerm || '');
       return [...grouped.values()]
         .map((item) => {
@@ -3657,25 +3726,26 @@
             </div>
             <h2>${focusedCharacter}</h2>
             <p class="section-subtitle">Actores asociados: ${actorCards.length} · desbloqueados: ${unlockedActors.length} · bloqueados: ${lockedActors.length}</p>
+            <p id="indiceCharacterFeedback" class="inline-feedback" aria-live="polite"></p>
             <section class="character-actors-grid">
               ${actorCards.map(item => item.locked
                 ? `
                   <article class="character-actor-card locked" aria-disabled="true">
                     <img src="${createPlaceholderCover(item.actorName)}" alt="Actor bloqueado: ${item.actorName}" loading="lazy">
                     <div class="meta">
-                      <h3>${item.actorName}</h3>
+                      <h3>${item.actorName} <button type="button" class="neon-btn icon-btn" data-add-greeting-actor="${item.actorName}" aria-label="Agregar video para ${item.actorName}">+</button></h3>
                       <p>🔒 Bloqueado</p>
                     </div>
                   </article>
                 `
                 : `
-                  <button type="button" class="character-actor-card unlocked" data-open-video="${item.video.id}">
+                  <article class="character-actor-card unlocked">
                     <img src="${getVideoThumbnail(item.video)}" alt="Miniatura de ${item.actorName} como ${focusedCharacter}" loading="lazy">
                     <div class="meta">
-                      <h3>${item.actorName}</h3>
-                      <p>▶ Ver video</p>
+                      <h3>${item.actorName} <button type="button" class="neon-btn icon-btn" data-add-greeting-actor="${item.actorName}" aria-label="Agregar otro video para ${item.actorName}">+</button></h3>
+                      <p><button type="button" class="neon-btn" data-open-video="${item.video.id}">▶ Ver video</button></p>
                     </div>
-                  </button>
+                  </article>
                 `).join('') || '<p class="muted">No hay actores asociados para este personaje.</p>'}
             </section>
           </section>
@@ -3686,6 +3756,50 @@
         });
         viewIndice.querySelectorAll('[data-open-video]').forEach((btn) => {
           btn.addEventListener('click', () => openVideoDetail(btn.dataset.openVideo));
+        });
+        viewIndice.querySelectorAll('[data-add-greeting-actor]').forEach((btn) => {
+          btn.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const actorName = btn.dataset.addGreetingActor;
+            if (!actorName) return;
+            const feedback = document.getElementById('indiceCharacterFeedback');
+            const rawUrl = prompt(`URL de YouTube para ${focusedCharacter} (${actorName}):`, '');
+            if (rawUrl === null) return;
+            const normalizedUrl = normalizeYoutubeUrl(rawUrl.trim());
+            if (!normalizedUrl) {
+              if (feedback) {
+                feedback.style.color = '#ffb6b6';
+                feedback.textContent = 'La URL de YouTube no es válida.';
+              }
+              return;
+            }
+            if (feedback) {
+              feedback.style.color = '#9ff7c8';
+              feedback.textContent = 'Guardando saludo...';
+            }
+            const metadata = await fetchYoutubeMetadata(normalizedUrl);
+            const existingCharacterVideos = VIDEOS.filter(v => normalizeName(v.personaje || '') === normalizeName(focusedCharacter));
+            const baseUniverses = [...new Set(existingCharacterVideos.flatMap(v => getVideoUniverses(v)))].filter(Boolean);
+            const targetUniverse = state.universe || baseUniverses[0] || 'Sin universo';
+            VIDEOS.push({
+              id: `video-${Date.now()}`,
+              titulo: metadata.title || `Saludo de ${focusedCharacter}`,
+              universo: [targetUniverse],
+              personaje: focusedCharacter,
+              actor_de_doblaje: actorName,
+              url_youtube: normalizedUrl,
+              rareza: 'Común',
+              thumbnail: metadata.thumbnail || ''
+            });
+            unlockBlockedCharacterForActor(actorName, focusedCharacter);
+            saveVideos();
+            refreshDependentViews();
+            if (feedback) {
+              feedback.style.color = '#9ff7c8';
+              feedback.textContent = 'Saludo agregado. El personaje quedó desbloqueado para este actor.';
+            }
+            renderIndiceView();
+          });
         });
         return;
       }
