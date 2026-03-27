@@ -1822,32 +1822,37 @@
     function groupByUniverse() {
       const grouped = VIDEOS.reduce((acc, item) => {
         const universes = Array.isArray(item.universo) ? item.universo : [item.universo];
-        universes.filter(Boolean).forEach((name) => {
-          if (!acc[name]) {
-            acc[name] = {
+        universes.filter(Boolean).forEach((rawName) => {
+          const key = normalizeUniverseName(rawName);
+          if (!key) return;
+          if (!acc[key]) {
+            const cleanName = String(rawName || '').trim() || 'Sin universo';
+            acc[key] = {
+              name: cleanName,
               videos: [],
               characters: new Set(),
               unlockedCharacters: new Set()
             };
           }
-          acc[name].videos.push(item);
+          acc[key].videos.push(item);
           const character = String(item.personaje || '').trim();
           if (character) {
-            acc[name].characters.add(character);
-            if (hasGreetingVideo(item)) acc[name].unlockedCharacters.add(character);
+            acc[key].characters.add(character);
+            if (hasGreetingVideo(item)) acc[key].unlockedCharacters.add(character);
           }
         });
         return acc;
       }, {});
       return Object.fromEntries(
-        Object.entries(grouped).map(([name, data]) => {
+        Object.entries(grouped).map(([key, data]) => {
           const totalCharacters = data.characters.size;
           const unlocked = data.unlockedCharacters.size;
           const completion = totalCharacters ? Math.round((unlocked / totalCharacters) * 100) : 0;
           let state = 'incomplete';
           if (completion === 100 && totalCharacters > 0) state = 'complete';
           else if (completion > 0) state = 'advanced';
-          return [name, {
+          return [key, {
+            name: data.name,
             videos: data.videos,
             totalCharacters,
             unlockedCharacters: unlocked,
@@ -2023,7 +2028,20 @@
     }
 
     function normalizeUniverseName(name) {
-      return name.trim().toLowerCase();
+      return String(name || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     function normalizeName(name) {
@@ -2322,7 +2340,8 @@
     }
 
     function getUniverseVideos() {
-      return VIDEOS.filter(v => getVideoUniverses(v).includes(state.universe));
+      const target = normalizeUniverseName(state.universe || '');
+      return VIDEOS.filter(v => getVideoUniverses(v).some(name => normalizeUniverseName(name) === target));
     }
 
     function getFilteredUniverseVideos() {
@@ -2495,7 +2514,7 @@
         state.universeNodes.push({
           id: cssSafe(firstName),
           name: firstName,
-          cover: getSafeUniverseCover(firstName, getUniverseCover(universeMap[firstName]?.videos || [])),
+          cover: getSafeUniverseCover(firstName, getUniverseCover(universeMap[normalizeUniverseName(firstName)]?.videos || [])),
           x: Math.round(state.mapCanvas.width / 2),
           y: Math.round(state.mapCanvas.height / 2),
           neighbors: [],
@@ -2526,7 +2545,7 @@
         state.universeNodes.push({
           id: cssSafe(name),
           name,
-          cover: getSafeUniverseCover(name, getUniverseCover(universeMap[name]?.videos || [])),
+          cover: getSafeUniverseCover(name, getUniverseCover(universeMap[normalizeUniverseName(name)]?.videos || [])),
           x: point.x,
           y: point.y,
           neighbors: point.anchorId ? [point.anchorId] : [],
@@ -2541,8 +2560,9 @@
         }
       });
       state.universeNodes.forEach(node => {
-        if (!node.cover && universeMap[node.name]) {
-          node.cover = getSafeUniverseCover(node.name, getUniverseCover(universeMap[node.name]?.videos || []));
+        const universeData = universeMap[normalizeUniverseName(node.name)];
+        if (!node.cover && universeData) {
+          node.cover = getSafeUniverseCover(node.name, getUniverseCover(universeData.videos || []));
         } else if (!node.cover) {
           node.cover = createPlaceholderCover(node.name);
         }
@@ -2554,15 +2574,16 @@
       const universes = groupByUniverse();
       ensureUniverseNodes();
       const nodesMarkup = state.universeNodes.map(node => {
-        const universeData = universes[node.name] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
+        const universeData = universes[normalizeUniverseName(node.name)] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
         const floatDelay = ((Math.abs(hashCode(node.id)) % 24) / 10).toFixed(1);
+        const safeName = escapeHtml(node.name);
         return `
-          <button class="universe-node" data-node-id="${node.id}" data-open="${node.name}" style="left:${node.x - NODE_HALF_WIDTH}px; top:${node.y - NODE_HALF_HEIGHT}px; border-radius:${node.shape}; --float-delay:-${floatDelay}s;">
+          <button class="universe-node" data-node-id="${node.id}" data-open="${safeName}" style="left:${node.x - NODE_HALF_WIDTH}px; top:${node.y - NODE_HALF_HEIGHT}px; border-radius:${node.shape}; --float-delay:-${floatDelay}s;">
             <span class="island-base" style="border-radius:${node.shape};"></span>
-            <img class="universe-cover" src="${getSafeUniverseCover(node.name, node.cover)}" alt="Portada de ${node.name}" loading="lazy">
+            <img class="universe-cover" src="${getSafeUniverseCover(node.name, node.cover)}" alt="Portada de ${safeName}" loading="lazy">
             <span class="cover-fallback">Portada no disponible</span>
             <span class="node-info">
-              <h3>${node.name}</h3>
+              <h3>${safeName}</h3>
               <p>${universeData.unlockedCharacters}/${universeData.totalCharacters} personajes</p>
               <span class="completion-badge completion-badge--${universeData.state}">
                 ${universeData.state === 'complete' ? 'Completo' : universeData.state === 'advanced' ? 'Avanzado' : 'Incompleto'}
@@ -2822,14 +2843,15 @@
     function renderUniverseView() {
       const videos = getUniverseVideos();
       const universeMap = groupByUniverse();
-      const universeData = universeMap[state.universe] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
+      const selectedUniverseKey = normalizeUniverseName(state.universe || '');
+      const universeData = universeMap[selectedUniverseKey] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
       const rarezas = ['Común', 'Raro', 'Épico', 'Legendario'];
       const filtered = getFilteredUniverseVideos().filter((video) => {
         const personaje = (video.personaje || '').toLowerCase();
         const actor = (video.actor_de_doblaje || '').toLowerCase();
         return personaje.includes(state.search.personaje.toLowerCase()) && actor.includes(state.search.actor.toLowerCase());
       });
-      const universeNode = state.universeNodes.find(node => node.name === state.universe);
+      const universeNode = state.universeNodes.find(node => normalizeUniverseName(node.name) === selectedUniverseKey);
       const headerCover = getSafeUniverseCover(state.universe, universeNode?.cover || getUniverseCover(videos));
       viewUniverse.innerHTML = `
         <div class="actions universe-view-animated">
@@ -2963,8 +2985,9 @@
           }
         }
         const cleanName = newName.trim();
+        const currentUniverseKey = normalizeUniverseName(state.universe || '');
         VIDEOS.forEach(video => {
-          const list = getVideoUniverses(video).map(u => u === state.universe ? cleanName : u);
+          const list = getVideoUniverses(video).map(u => normalizeUniverseName(u) === currentUniverseKey ? cleanName : u);
           video.universo = [...new Set(list)];
         });
         if (universeNode) {
@@ -2980,9 +3003,10 @@
       document.getElementById('deleteUniverse').onclick = () => {
         const ok = confirm(`¿Eliminar universo "${state.universe}"? Se quitará de los videos relacionados.`);
         if (!ok) return;
-        state.universeNodes = state.universeNodes.filter(node => node.name !== state.universe);
+        const currentUniverseKey = normalizeUniverseName(state.universe || '');
+        state.universeNodes = state.universeNodes.filter(node => normalizeUniverseName(node.name) !== currentUniverseKey);
         VIDEOS.forEach(video => {
-          video.universo = getVideoUniverses(video).filter(name => name !== state.universe);
+          video.universo = getVideoUniverses(video).filter(name => normalizeUniverseName(name) !== currentUniverseKey);
         });
         for (let i = VIDEOS.length - 1; i >= 0; i -= 1) {
           if (!getVideoUniverses(VIDEOS[i]).length) VIDEOS.splice(i, 1);
