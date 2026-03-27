@@ -2178,23 +2178,50 @@
       if (state.view === 'collection') renderCollectionView();
     }
 
+    function normalizeUniverseNodes(nodes) {
+      if (!Array.isArray(nodes)) return [];
+      return nodes
+        .filter(node => node && typeof node.name === 'string')
+        .map((node, idx) => ({
+          id: node.id || cssSafe(node.name) || `universo-${idx}`,
+          name: node.name.trim(),
+          cover: typeof node.cover === 'string' ? node.cover : '',
+          x: Number(node.x) || 220 + (idx * 80),
+          y: Number(node.y) || 220 + (idx * 60),
+          neighbors: Array.isArray(node.neighbors) ? node.neighbors.filter(Boolean) : [],
+          shape: node.shape || createNodeShape(hashCode(node.name))
+        }))
+        .filter(node => node.name);
+    }
+
+    function mergeUniverseNodes(...sources) {
+      const mergedByName = new Map();
+      sources.forEach((source) => {
+        normalizeUniverseNodes(source).forEach((node) => {
+          const key = normalizeUniverseName(node.name);
+          if (!key) return;
+          const existing = mergedByName.get(key);
+          if (!existing) {
+            mergedByName.set(key, { ...node });
+            return;
+          }
+          mergedByName.set(key, {
+            ...existing,
+            ...node,
+            cover: node.cover || existing.cover || '',
+            neighbors: [...new Set([...(existing.neighbors || []), ...(node.neighbors || [])])]
+          });
+        });
+      });
+      return [...mergedByName.values()];
+    }
+
     function loadUniverseNodesFromStorage() {
       try {
         const raw = localStorage.getItem(UNIVERSES_STORAGE_KEY);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-          .filter(node => node && typeof node.name === 'string')
-          .map((node, idx) => ({
-            id: node.id || cssSafe(node.name) || `universo-${idx}`,
-            name: node.name.trim(),
-            cover: typeof node.cover === 'string' ? node.cover : '',
-            x: Number(node.x) || 220 + (idx * 80),
-            y: Number(node.y) || 220 + (idx * 60),
-            neighbors: Array.isArray(node.neighbors) ? node.neighbors.filter(Boolean) : [],
-            shape: node.shape || createNodeShape(hashCode(node.name))
-          }));
+        return normalizeUniverseNodes(parsed);
       } catch (_) {
         return [];
       }
@@ -2244,7 +2271,7 @@
         if (!data || typeof data !== 'object') return;
 
         if (Array.isArray(data.universeNodes)) {
-          state.universeNodes = data.universeNodes;
+          state.universeNodes = mergeUniverseNodes(state.universeNodes, data.universeNodes);
           localStorage.setItem(UNIVERSES_STORAGE_KEY, JSON.stringify(state.universeNodes));
         }
         if (Array.isArray(data.videos)) {
