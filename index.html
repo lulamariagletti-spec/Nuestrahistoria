@@ -1762,6 +1762,7 @@
       marathon: { active: false, queue: [], position: 0 },
       universeNodes: [],
       mapCanvas: { width: 1400, height: 900 },
+      mapViewport: { scale: 1, centroidX: 0, centroidY: 0 },
       blockedCharactersByActor: {},
       characterProfileId: null,
       indiceSearch: '',
@@ -2413,18 +2414,28 @@
       return null;
     }
 
-    function resolveNodeCollision(x, y, existingNodes) {
-      const minDistance = 225;
-      const collides = (px, py) => existingNodes.some(node => Math.hypot(node.x - px, node.y - py) < minDistance);
-      if (!collides(x, y)) return { x, y };
-      for (let i = 1; i <= 32; i += 1) {
-        const angle = i * 0.9;
-        const radius = 24 + (i * 16);
-        const candidateX = Math.round(x + Math.cos(angle) * radius);
-        const candidateY = Math.round(y + Math.sin(angle) * radius);
-        if (!collides(candidateX, candidateY)) return { x: candidateX, y: candidateY };
+    function getUniverseBounds() {
+      if (!state.universeNodes.length) return null;
+      const minX = Math.min(...state.universeNodes.map(node => node.x - NODE_HALF_WIDTH));
+      const maxX = Math.max(...state.universeNodes.map(node => node.x + NODE_HALF_WIDTH));
+      const minY = Math.min(...state.universeNodes.map(node => node.y - NODE_HALF_HEIGHT));
+      const maxY = Math.max(...state.universeNodes.map(node => node.y + NODE_HALF_HEIGHT));
+      return { minX, maxX, minY, maxY };
+    }
+
+    function getUniverseCentroid() {
+      if (!state.universeNodes.length) {
+        return { x: state.mapCanvas.width / 2, y: state.mapCanvas.height / 2 };
       }
-      return { x: x + 48, y: y + 48 };
+      const sum = state.universeNodes.reduce((acc, node) => {
+        acc.x += node.x;
+        acc.y += node.y;
+        return acc;
+      }, { x: 0, y: 0 });
+      return {
+        x: sum.x / state.universeNodes.length,
+        y: sum.y / state.universeNodes.length
+      };
     }
 
     function recalculateMapCanvasSize(viewportWidth = 0, viewportHeight = 0) {
@@ -2562,8 +2573,35 @@
         mapCanvas.style.height = `${state.mapCanvas.height}px`;
         mapWorld.style.width = `${state.mapCanvas.width}px`;
         mapWorld.style.height = `${state.mapCanvas.height}px`;
+        const bounds = getUniverseBounds();
+        if (!bounds) {
+          state.mapViewport.scale = 1;
+          mapWorld.style.transform = 'scale(1)';
+          state.mapViewport.centroidX = state.mapCanvas.width / 2;
+          state.mapViewport.centroidY = state.mapCanvas.height / 2;
+          return;
+        }
+        const padding = 48;
+        const availableWidth = Math.max(220, mapShell.clientWidth - (padding * 2));
+        const availableHeight = Math.max(220, mapShell.clientHeight - (padding * 2));
+        const spanWidth = Math.max(1, bounds.maxX - bounds.minX);
+        const spanHeight = Math.max(1, bounds.maxY - bounds.minY);
+        const scale = Math.min(1, availableWidth / spanWidth, availableHeight / spanHeight);
+        state.mapViewport.scale = Math.max(0.3, Number(scale.toFixed(3)));
+        mapWorld.style.transformOrigin = '0 0';
+        mapWorld.style.transform = `scale(${state.mapViewport.scale})`;
+        const centroid = getUniverseCentroid();
+        state.mapViewport.centroidX = centroid.x;
+        state.mapViewport.centroidY = centroid.y;
       };
       syncMapCanvasSize();
+      if (mapShell && state.universeNodes.length) {
+        const scale = state.mapViewport.scale || 1;
+        const targetX = (state.mapViewport.centroidX * scale) - (mapShell.clientWidth / 2);
+        const targetY = (state.mapViewport.centroidY * scale) - (mapShell.clientHeight / 2);
+        mapShell.scrollLeft = Math.max(0, targetX);
+        mapShell.scrollTop = Math.max(0, targetY);
+      }
 
       const closePopup = () => {
         const popup = document.getElementById('mapPopup');
@@ -2652,13 +2690,12 @@
 
           const boundedX = Math.max(NODE_HALF_WIDTH, Math.min(Math.round(x), state.mapCanvas.width - NODE_HALF_WIDTH));
           const boundedY = Math.max(NODE_HALF_HEIGHT, Math.min(Math.round(y), state.mapCanvas.height - NODE_HALF_HEIGHT));
-          const adjusted = resolveNodeCollision(boundedX, boundedY, state.universeNodes);
           state.universeNodes.push({
             id: cssSafe(`${name}-${Date.now()}`),
             name,
             cover,
-            x: adjusted.x,
-            y: adjusted.y,
+            x: boundedX,
+            y: boundedY,
             neighbors: [],
             shape: createNodeShape(hashCode(name))
           });
@@ -2689,8 +2726,12 @@
 
       mapWorld.addEventListener('click', (event) => {
         event.stopPropagation();
-        const rect = mapWorld.getBoundingClientRect();
-        openPopupAt(event.clientX - rect.left, event.clientY - rect.top);
+        if (!mapShell) return;
+        const rect = mapCanvas.getBoundingClientRect();
+        const scale = state.mapViewport.scale || 1;
+        const worldX = (event.clientX - rect.left + mapShell.scrollLeft) / scale;
+        const worldY = (event.clientY - rect.top + mapShell.scrollTop) / scale;
+        openPopupAt(worldX, worldY);
       });
 
       window.addEventListener('resize', syncMapCanvasSize, { once: true });
