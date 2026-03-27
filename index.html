@@ -3704,16 +3704,6 @@
         const universe = getOrCreateUniverse(collectionModel, selectedUniverse, universeMap);
         linkActorCharacter(actor.id, character.id, collectionModel);
         linkCharacterUniverse(character.id, universe.id, collectionModel);
-        addOrUpdateVideoModelEntry({
-          id: createModelId('video', `${normalizeName(characterName)}-${normalizeName(actorName)}-${Date.now()}-${idx}`),
-          title: `Registro de ${characterName}`,
-          youtubeUrl: '',
-          thumbnail: createPlaceholderCover(characterName),
-          rarity: 'Común',
-          actorId: actor.id,
-          characterId: character.id,
-          universeIds: [universe.id]
-        }, collectionModel);
         VIDEOS.push({
           id: `video-${Date.now()}-${idx}`,
           titulo: `Registro de ${characterName}`,
