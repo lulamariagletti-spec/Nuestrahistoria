@@ -395,7 +395,7 @@
         radial-gradient(circle at 88% 16%, rgba(176, 110, 255, .12), transparent 32%),
         rgba(6, 11, 24, 0.95);
       scroll-behavior: smooth;
-      cursor: crosshair;
+      cursor: grab;
       user-select: none;
     }
     .universe-map-shell.is-dragging { cursor: grabbing; }
@@ -2627,12 +2627,6 @@
 
       const mapShell = viewMap.querySelector('.universe-map-shell');
 
-      const centerMapCamera = () => {
-        if (!mapShell) return;
-        state.mapCamera.x = (mapShell.clientWidth / 2) - ((state.mapCanvas.width / 2) * state.mapCamera.zoom);
-        state.mapCamera.y = (mapShell.clientHeight / 2) - ((state.mapCanvas.height / 2) * state.mapCamera.zoom);
-      };
-
       const syncMapCanvasSize = () => {
         if (!mapShell) return;
         recalculateMapCanvasSize(mapShell.clientWidth, mapShell.clientHeight);
@@ -2641,10 +2635,11 @@
         mapWorld.style.width = `${state.mapCanvas.width}px`;
         mapWorld.style.height = `${state.mapCanvas.height}px`;
         state.mapCamera.nodeScale = getDynamicNodeScale();
-        state.mapCamera.minZoom = getFitZoom(mapShell.clientWidth, mapShell.clientHeight);
+        state.mapCamera.minZoom = getFitZoom(state.mapCanvas.width, state.mapCanvas.height);
         state.mapCamera.maxZoom = Math.max(state.mapCamera.minZoom + 0.5, 3.2);
         state.mapCamera.zoom = Math.max(state.mapCamera.minZoom, Math.min(state.mapCamera.zoom, state.mapCamera.maxZoom));
-        centerMapCamera();
+        state.mapCamera.x = (state.mapCanvas.width / 2) - ((state.mapCanvas.width / 2) * state.mapCamera.zoom);
+        state.mapCamera.y = (state.mapCanvas.height / 2) - ((state.mapCanvas.height / 2) * state.mapCamera.zoom);
         applyMapCameraTransform(mapWorld);
       };
       syncMapCanvasSize();
@@ -2774,7 +2769,7 @@
         });
       });
 
-      mapCanvas.addEventListener('click', (event) => {
+      mapWorld.addEventListener('click', (event) => {
         if (Date.now() < state.mapCamera.suppressClickUntil || event.target.closest('.universe-node')) return;
         event.stopPropagation();
         const rect = mapCanvas.getBoundingClientRect();
