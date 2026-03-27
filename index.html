@@ -1674,7 +1674,7 @@
         <div class="sidebar-copy">
           <h1 class="title"><span class="title-emoji">🛸</span><span class="title-text">UNIVOICER</span><span class="title-emoji">✨</span></h1>
         </div>
-        <button id="toggleSidebar" class="sidebar-toggle">↔️ Colapsar menú</button>
+        <button id="toggleSidebar" class="sidebar-toggle" aria-label="Colapsar menú">←</button>
         <nav class="sidebar-nav">
           <button id="navUniverses" class="sidebar-item active">
             <span class="sidebar-item-icon" aria-hidden="true">🌌</span>
@@ -3807,7 +3807,9 @@
 
     toggleSidebar.onclick = () => {
       appLayout.classList.toggle('sidebar-collapsed');
-      toggleSidebar.textContent = appLayout.classList.contains('sidebar-collapsed') ? '➡️ Expandir menú' : '↔️ Colapsar menú';
+      const isCollapsed = appLayout.classList.contains('sidebar-collapsed');
+      toggleSidebar.textContent = isCollapsed ? '→' : '←';
+      toggleSidebar.setAttribute('aria-label', isCollapsed ? 'Expandir menú' : 'Colapsar menú');
     };
 
     navUniverses.onclick = () => changeView(state.universe ? 'universe' : 'map');
