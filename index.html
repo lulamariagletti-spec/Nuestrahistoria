@@ -3489,10 +3489,13 @@
       `;
     }
 
-    function renderCharacterProfile(characterId) {
+    function openCharacterProfileFromCollectionCard(characterId) {
       const entry = getGlobalCharacterCollection().find(item => item.id === characterId);
       if (!entry || !entry.unlocked) return;
-      openCharacterProfile(entry.name);
+      const profileId = getCharacterIdByName(entry.name);
+      if (!profileId) return;
+      state.characterProfileId = profileId;
+      changeView('characterProfile');
     }
 
     function renderCollectionView() {
@@ -3559,7 +3562,7 @@
         card.addEventListener('click', () => {
           const { characterId } = card.dataset;
           if (!characterId) return;
-          renderCharacterProfile(characterId);
+          openCharacterProfileFromCollectionCard(characterId);
         });
       });
     }
