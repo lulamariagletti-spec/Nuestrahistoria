@@ -2267,6 +2267,14 @@
       if (state.view === 'collection') renderCollectionView();
     }
 
+    function blockCharacterForActor(actorName, characterName) {
+      if (!actorName || !characterName) return;
+      const current = state.blockedCharactersByActor[actorName] || [];
+      state.blockedCharactersByActor[actorName] = [...new Set([...current, characterName])];
+      saveBlockedCharacters();
+      if (state.view === 'collection') renderCollectionView();
+    }
+
     function normalizeUniverseNodes(nodes) {
       if (!Array.isArray(nodes)) return [];
       return nodes
@@ -3286,7 +3294,8 @@
         video.actor_de_doblaje = actorNuevo.trim() || 'Sin actor';
         video.rareza = rarezasPermitidas(rarezaNueva);
         video.universo = universosNuevos.split(',').map(u => u.trim()).filter(Boolean);
-        unlockBlockedCharacterForActor(video.actor_de_doblaje, video.personaje);
+        if (hasGreetingVideo(video)) unlockBlockedCharacterForActor(video.actor_de_doblaje, video.personaje);
+        else blockCharacterForActor(video.actor_de_doblaje, video.personaje);
         ensureUniverseNodes();
         saveVideos();
         renderMapView();
@@ -3331,7 +3340,7 @@
       const universes = [...new Set(videos.flatMap(v => getVideoUniverses(v).map(name => String(name || '').trim())).filter(Boolean))];
       const blockedActors = Object.entries(state.blockedCharactersByActor)
         .filter(([actorName, blocked]) => blocked.some(item => normalizeName(item) === normalizeName(characterName))
-          && !videos.some(v => normalizeName(v.actor_de_doblaje) === normalizeName(actorName)))
+          && !videos.some(v => normalizeName(v.actor_de_doblaje) === normalizeName(actorName) && hasGreetingVideo(v)))
         .map(([actorName]) => actorName);
       const status = blockedActors.length ? 'Bloqueado' : 'Desbloqueado';
       return { characterName, videos, actors, universes, blockedActors, status };
@@ -3403,7 +3412,7 @@
           rareza: 'Común',
           thumbnail: createPlaceholderCover(baseUniverses[0] || 'Universo')
         });
-        unlockBlockedCharacterForActor(canonicalActor, characterName);
+        blockCharacterForActor(canonicalActor, characterName);
         ensureUniverseNodes();
         saveVideos();
         refreshDependentViews();
@@ -3573,7 +3582,7 @@
       const unlockedByActor = new Map();
       videosByCharacter.forEach((video) => {
         const actorName = String(video.actor_de_doblaje || 'Sin actor').trim() || 'Sin actor';
-        if (!unlockedByActor.has(actorName)) unlockedByActor.set(actorName, video);
+        if (!unlockedByActor.has(actorName) && hasGreetingVideo(video)) unlockedByActor.set(actorName, video);
       });
       const blockedActors = Object.entries(state.blockedCharactersByActor)
         .filter(([actorName, blockedList]) => blockedList.some(item => normalizeName(item) === normalizedCharacter)
@@ -3717,6 +3726,7 @@
           rareza: 'Común',
           thumbnail: createPlaceholderCover(characterName)
         });
+        blockCharacterForActor(actor.name, characterName);
       });
       ensureUniverseNodes();
       saveCollectionModel();
@@ -3974,7 +3984,7 @@
       const blockedOnly = blockedCharacters.filter(name => !actorCharacters.includes(name));
       const actorCharacterCards = [
         ...actorCharacters.map((characterName) => {
-          const relatedVideo = actorVideos.find(item => (item.personaje || 'Sin personaje') === characterName);
+          const relatedVideo = actorVideos.find(item => (item.personaje || 'Sin personaje') === characterName && hasGreetingVideo(item));
           return {
             characterName,
             unlocked: Boolean(relatedVideo),
