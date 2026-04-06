@@ -3730,6 +3730,12 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
   <script>
     const VIDEOS = [];
+    let AUTO_MARATHON_PLAYLIST = Object.freeze({
+      id: 'auto-todos',
+      name: 'Auto • Todos los personajes',
+      source: 'auto',
+      videoIds: Object.freeze([])
+    });
     const firebaseConfig = {
       apiKey: 'AIzaSyD7Hn2RHrDQRlUB-XcPtsDQ8WzWQ-q426Y',
       authDomain: 'univoicer-580d6.firebaseapp.com',
@@ -3755,7 +3761,7 @@
       universeAddMode: 'video',
       showEditUniverseForm: false,
       editUniverseFeedback: { type: '', text: '' },
-      marathon: { active: false, queue: [], position: 0 },
+      marathon: { active: false, queue: [], position: 0, playlists: [], selectedPlaylistId: null },
       universeNodes: [],
       mapCanvas: { width: 1400, height: 900 },
       mapViewport: { scale: 1, centroidX: 0, centroidY: 0 },
@@ -4478,6 +4484,7 @@
       localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
       collectionModel = mergeModelWithLegacyVideos(collectionModel, VIDEOS);
       saveCollectionModel();
+      buildAutoMarathonPlaylist();
       scheduleCloudSync();
       renderMapView();
     }
@@ -4485,13 +4492,16 @@
     function loadVideosFromStorage() {
       try {
         const raw = localStorage.getItem(VIDEOS_STORAGE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return;
-        VIDEOS.splice(0, VIDEOS.length, ...parsed.filter(video => video && typeof video === 'object'));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            VIDEOS.splice(0, VIDEOS.length, ...parsed.filter(video => video && typeof video === 'object'));
+          }
+        }
       } catch (_) {
         VIDEOS.splice(0, VIDEOS.length);
       }
+      buildAutoMarathonPlaylist();
     }
 
     function hydrateModelWithFallback() {
@@ -4516,7 +4526,10 @@
       try {
         const snapshot = await firebaseDb.ref(CLOUD_STORAGE_PATH).get();
         const data = snapshot.val();
-        if (!data || typeof data !== 'object') return;
+        if (!data || typeof data !== 'object') {
+          buildAutoMarathonPlaylist();
+          return;
+        }
 
         if (Array.isArray(data.universeNodes)) {
           state.universeNodes = mergeUniverseNodes(state.universeNodes, data.universeNodes);
@@ -4541,9 +4554,39 @@
           collectionModel = migrateLegacyVideosToModel(VIDEOS);
           localStorage.setItem(COLLECTION_MODEL_STORAGE_KEY, JSON.stringify(collectionModel));
         }
+        buildAutoMarathonPlaylist();
       } catch (err) {
         console.warn('No se pudo leer Firebase, usando almacenamiento local.', err);
+        buildAutoMarathonPlaylist();
       }
+    }
+
+    function buildAutoMarathonPlaylist() {
+      const sortedPlayableVideos = [...VIDEOS]
+        .filter((video) => Boolean(getYoutubeId(video?.url_youtube || '')))
+        .sort((a, b) => String(a?.personaje || '').localeCompare(String(b?.personaje || ''), 'es', { sensitivity: 'base' }));
+      AUTO_MARATHON_PLAYLIST = Object.freeze({
+        id: 'auto-todos',
+        name: 'Auto • Todos los personajes',
+        source: 'auto',
+        videoIds: Object.freeze(sortedPlayableVideos.map((video) => video.id))
+      });
+      state.marathon.playlists = [AUTO_MARATHON_PLAYLIST];
+      const playlistExists = state.marathon.playlists.some((playlist) => playlist.id === state.marathon.selectedPlaylistId);
+      if (!playlistExists) {
+        state.marathon.selectedPlaylistId = AUTO_MARATHON_PLAYLIST.id;
+      }
+      return AUTO_MARATHON_PLAYLIST;
+    }
+
+    function getMarathonQueue() {
+      const selectedPlaylistId = state.marathon.selectedPlaylistId || AUTO_MARATHON_PLAYLIST.id;
+      if (selectedPlaylistId === AUTO_MARATHON_PLAYLIST.id) {
+        return AUTO_MARATHON_PLAYLIST.videoIds
+          .map((videoId) => VIDEOS.find((video) => video.id === videoId))
+          .filter(Boolean);
+      }
+      return getFilteredUniverseVideos();
     }
 
     function scheduleCloudSync() {
@@ -6988,22 +7031,36 @@
     }
 
     function renderMaratonView() {
+      const playlists = state.marathon.playlists?.length ? state.marathon.playlists : [buildAutoMarathonPlaylist()];
+      const selectedPlaylistId = playlists.some((playlist) => playlist.id === state.marathon.selectedPlaylistId)
+        ? state.marathon.selectedPlaylistId
+        : playlists[0].id;
+      if (selectedPlaylistId !== state.marathon.selectedPlaylistId) {
+        state.marathon.selectedPlaylistId = selectedPlaylistId;
+      }
       viewMaraton.innerHTML = `
         <section class="mock-shell">
           <h2>Modo Maratón</h2>
           <div class="mock-row">
-            <select aria-label="Selector de maratón mock">
-              <option>Universo actual (mock)</option>
-              <option>Rareza alta (mock)</option>
+            <select id="marathonPlaylistSelector" aria-label="Selector de playlist de maratón">
+              ${playlists.map((playlist) => `<option value="${playlist.id}" ${playlist.id === selectedPlaylistId ? 'selected' : ''}>${playlist.name}</option>`).join('')}
             </select>
-            <button class="neon-btn toon-btn toon-btn--primary">Iniciar transmisión</button>
+            <button id="startMarathonStream" class="neon-btn toon-btn toon-btn--primary">Iniciar transmisión</button>
           </div>
           <div class="mock-box">
             <strong>Placeholder de video</strong>
             <p class="muted">Aquí se mostrará el stream continuo de saludos.</p>
+            <p id="marathonState" class="muted">Modo Maratón desactivado</p>
           </div>
         </section>
       `;
+      document.getElementById('marathonPlaylistSelector')?.addEventListener('change', (event) => {
+        state.marathon.selectedPlaylistId = event.target.value || AUTO_MARATHON_PLAYLIST.id;
+      });
+      document.getElementById('startMarathonStream')?.addEventListener('click', () => {
+        startMarathon();
+      });
+      updateMarathonLabel();
     }
 
     function renderRarezasView() {
@@ -7516,7 +7573,7 @@
     }
 
     function startMarathon() {
-      const queue = getFilteredUniverseVideos();
+      const queue = getMarathonQueue();
       if (!queue.length) return;
       state.marathon.active = true;
       state.marathon.queue = queue;
