@@ -1330,23 +1330,53 @@
     .video-card h3 { margin: 0 0 6px; font-size: 1rem; }
     .video-card p { margin: 0; color: var(--muted); font-size: .92rem; }
 
+    .actor-alpha-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .actor-alpha-btn {
+      min-width: 34px;
+      min-height: 34px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(145, 219, 255, .48);
+      background: linear-gradient(170deg, rgba(15, 35, 68, .92), rgba(12, 26, 52, .9));
+      color: #d9f3ff;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    .actor-alpha-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(172, 233, 255, .85);
+      box-shadow: 0 0 14px rgba(110, 205, 255, .25);
+    }
+    .actor-alpha-btn.active {
+      border-color: var(--accent);
+      box-shadow: var(--accent-glow);
+    }
     .actor-gallery {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 18px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
       position: relative;
       z-index: 1;
     }
     .actor-card {
       text-align: left;
-      padding: 16px 15px;
-      border-radius: 20px;
+      min-height: 110px;
+      padding: 12px 12px 10px;
+      border-radius: 16px;
       border: 1px solid rgba(122, 196, 255, .46);
       background:
-        radial-gradient(circle at 8% 14%, rgba(145, 229, 255, .2), transparent 34%),
+        radial-gradient(circle at 14% 12%, rgba(255, 243, 150, .14), transparent 30%),
+        radial-gradient(circle at 88% 8%, rgba(255, 166, 87, .16), transparent 28%),
         linear-gradient(165deg, rgba(12, 24, 48, .94), rgba(19, 37, 70, .84));
       display: grid;
-      gap: 8px;
+      grid-template-rows: 1fr auto;
+      gap: 6px;
       cursor: pointer;
       position: relative;
       overflow: hidden;
@@ -1388,15 +1418,36 @@
     }
     .actor-card-title {
       margin: 0;
-      font-size: 1.02rem;
-      color: #ebf9ff;
+      font-size: clamp(1.2rem, .8rem + 1vw, 1.65rem);
+      line-height: 1.05;
+      text-align: center;
+      color: #ffe26d;
+      letter-spacing: .02em;
+      text-shadow:
+        0 1px 0 rgba(255, 210, 99, .9),
+        0 2px 0 rgba(255, 141, 50, .9),
+        0 3px 0 rgba(117, 54, 14, .94),
+        0 6px 10px rgba(0, 0, 0, .42),
+        0 0 18px rgba(255, 188, 82, .36);
+      filter: saturate(1.06) contrast(1.05);
+    }
+    .actor-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      gap: 8px;
     }
     .actor-card-meta {
       margin: 0;
       color: #c4dffa;
-      font-size: .9rem;
-      font-weight: 600;
-      letter-spacing: .01em;
+      font-size: .74rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+    .actor-inline-detail {
+      grid-column: 1 / -1;
     }
     .actor-detail-grid {
       display: grid;
@@ -3530,6 +3581,7 @@
       html, body { overflow: auto; }
     }
     @media (max-width: 720px) {
+      .actor-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .actor-gallery { gap: 12px; }
       .actor-card {
         border-radius: 16px;
@@ -3539,6 +3591,12 @@
       .actor-card.active {
         transform: translateY(-2px);
         box-shadow: 0 10px 16px rgba(4, 11, 28, .42), 0 0 14px rgba(104, 196, 255, .24);
+      }
+      .actor-card-title {
+        font-size: clamp(1.02rem, .9rem + 1.2vw, 1.25rem);
+      }
+      .actor-card-meta {
+        font-size: .68rem;
       }
       .actor-character-item {
         border-radius: 14px;
@@ -3604,6 +3662,9 @@
       .character-actor-card.unlocked:hover {
         transform: perspective(860px) rotateX(2deg) translateY(-2px) scale(1.015);
       }
+    }
+    @media (max-width: 520px) {
+      .actor-gallery { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -3687,6 +3748,7 @@
       search: { personaje: '', actor: '' },
       selectedVideoId: null,
       actorFocus: null,
+      actorLetterFilter: 'top',
       actorDetailsExpanded: false,
       actorRenameModalOpen: false,
       showAddForm: false,
@@ -4106,6 +4168,12 @@
 
     function normalizeName(name) {
       return String(name || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function getActorInitialLetter(name) {
+      const first = (String(name || '').trim().match(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/) || [])[0] || '';
+      const plain = first.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+      return plain >= 'A' && plain <= 'Z' ? plain : '#';
     }
 
     function getCharacterIdByName(name) {
@@ -5755,6 +5823,7 @@
         if (!actorName) return;
         modal.remove();
         state.actorFocus = actorName;
+        state.actorLetterFilter = getActorInitialLetter(actorName);
         state.actorDetailsExpanded = true;
         changeView('actores');
       });
@@ -6748,6 +6817,7 @@
             const actorName = btn.dataset.openActorProfile;
             if (!actorName) return;
             state.actorFocus = actorName;
+            state.actorLetterFilter = getActorInitialLetter(actorName);
             state.actorDetailsExpanded = true;
             changeView('actores');
           });
@@ -6996,7 +7066,30 @@
       collectionModel.actors.forEach((item) => registerActorName(item?.name));
       VIDEOS.forEach((video) => registerActorName(video?.actor_de_doblaje));
       const actors = [...actorNameByNormalized.values()].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-      if (state.actorFocus && !actors.includes(state.actorFocus)) {
+      const actorSummaries = actors.map((name) => {
+        const entries = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === name);
+        const videos = entries.filter(v => hasGreetingVideo(v));
+        const characters = [...new Set(entries.map(v => v.personaje || 'Sin personaje'))];
+        return {
+          name,
+          entries,
+          videosCount: videos.length,
+          charactersCount: characters.length,
+          initial: getActorInitialLetter(name)
+        };
+      }).sort((a, b) => (
+        b.charactersCount - a.charactersCount
+        || b.videosCount - a.videosCount
+        || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+      ));
+
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      const activeLetterFilter = state.actorLetterFilter || 'top';
+      const filteredActorSummaries = activeLetterFilter === 'top'
+        ? actorSummaries.slice(0, 8)
+        : actorSummaries.filter((item) => item.initial === activeLetterFilter);
+      const visibleActorNames = filteredActorSummaries.map((item) => item.name);
+      if (state.actorFocus && !visibleActorNames.includes(state.actorFocus)) {
         state.actorFocus = null;
         state.actorDetailsExpanded = false;
       }
@@ -7039,11 +7132,50 @@
           };
         })
       ];
+      const actorInlineDetailMarkup = actor && state.actorDetailsExpanded ? `
+        <article class="mock-box actor-detail-grid mock-gap-md toon-panel actor-inline-detail">
+          <div>
+            <div class="actor-detail-header">
+              <h3 class="actor-detail-title"><span class="actor-detail-name">${actor}</span></h3>
+              <div class="actions actor-detail-actions">
+              <button id="editActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--edit" aria-label="Editar actor" title="Editar actor">✏️</button>
+              <button id="deleteActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--danger" aria-label="Eliminar actor" title="Eliminar actor">🗑️</button>
+              </div>
+            </div>
+            <p class="muted">Personajes: ${actorCharacters.length} · Videos: ${actorVideos.length}</p>
+            <div class="actions actor-blocked-actions">
+              <input id="blockedCharacterInput" type="text" placeholder="Agregar personaje bloqueado">
+              <button id="addBlockedCharacter" class="neon-btn">Agregar bloqueado</button>
+            </div>
+            <ul class="actor-character-list">
+              ${actorCharacterCards.map((item) => `
+                <li class="actor-character-item">
+                  ${renderCharacterGalleryCard({
+                    name: item.characterName,
+                    coverVideo: item.video || null,
+                    rareza: item.rarity,
+                    unlocked: item.unlocked
+                  }, { locked: !item.unlocked })}
+                </li>
+              `).join('') || '<li class="actor-character-item"><p class="muted">Sin personajes registrados.</p></li>'}
+            </ul>
+          </div>
+        </article>
+      ` : '';
+
+      const selectedActorIndex = filteredActorSummaries.findIndex((item) => item.name === actor);
+
       viewActores.innerHTML = `
         <section class="mock-shell holo-card actors-shell">
           <div class="mock-topbar">
             <h2 class="actor-panel-title no-margin toon-title">Colección de actores</h2>
             <button id="toggleActorFormBtn" class="neon-btn actor-action-btn">Agregar Nuevo Actor</button>
+          </div>
+          <div class="actor-alpha-filter" aria-label="Filtro alfabético de actores">
+            <button type="button" class="actor-alpha-btn ${activeLetterFilter === 'top' ? 'active' : ''}" data-actor-letter="top">Top 8</button>
+            ${alphabet.map((letter) => `
+              <button type="button" class="actor-alpha-btn ${activeLetterFilter === letter ? 'active' : ''}" data-actor-letter="${letter}">${letter}</button>
+            `).join('')}
           </div>
 
           <form id="addActorForm" class="add-character-form mock-form-hidden">
@@ -7059,49 +7191,17 @@
           </form>
 
           <div class="actor-gallery mock-gap-lg">
-            ${actors.map((name) => {
-              const entries = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === name);
-              const videos = entries.filter(v => hasGreetingVideo(v));
-              const characters = [...new Set(entries.map(v => v.personaje || 'Sin personaje'))];
-              return `
-                <button type="button" class="actor-card ${name === actor ? 'active' : ''}" data-actor-card="${name}">
-                  <h3 class="actor-card-title">${name}</h3>
-                  <p class="actor-card-meta">Personajes: ${characters.length}</p>
-                  <p class="actor-card-meta">Videos: ${videos.length}</p>
-                </button>
-              `;
-            }).join('') || '<p class="muted">Sin actores registrados.</p>'}
+            ${filteredActorSummaries.map((item, idx) => `
+              <button type="button" class="actor-card ${item.name === actor ? 'active' : ''}" data-actor-card="${item.name}">
+                <h3 class="actor-card-title">${item.name}</h3>
+                <div class="actor-card-footer">
+                  <p class="actor-card-meta">Personajes: ${item.charactersCount}</p>
+                  <p class="actor-card-meta">Videos: ${item.videosCount}</p>
+                </div>
+              </button>
+              ${selectedActorIndex === idx ? actorInlineDetailMarkup : ''}
+            `).join('') || '<p class="muted">No hay actores para este filtro.</p>'}
           </div>
-          ${actor && state.actorDetailsExpanded ? `
-            <article class="mock-box actor-detail-grid mock-gap-md toon-panel">
-              <div>
-                <div class="actor-detail-header">
-                  <h3 class="actor-detail-title"><span class="actor-detail-name">${actor}</span></h3>
-                  <div class="actions actor-detail-actions">
-                  <button id="editActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--edit" aria-label="Editar actor" title="Editar actor">✏️</button>
-                  <button id="deleteActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--danger" aria-label="Eliminar actor" title="Eliminar actor">🗑️</button>
-                  </div>
-                </div>
-                <p class="muted">Personajes: ${actorCharacters.length} · Videos: ${actorVideos.length}</p>
-                <div class="actions actor-blocked-actions">
-                  <input id="blockedCharacterInput" type="text" placeholder="Agregar personaje bloqueado">
-                  <button id="addBlockedCharacter" class="neon-btn">Agregar bloqueado</button>
-                </div>
-                <ul class="actor-character-list">
-                  ${actorCharacterCards.map((item) => `
-                    <li class="actor-character-item">
-                      ${renderCharacterGalleryCard({
-                        name: item.characterName,
-                        coverVideo: item.video || null,
-                        rareza: item.rarity,
-                        unlocked: item.unlocked
-                      }, { locked: !item.unlocked })}
-                    </li>
-                  `).join('') || '<li class="actor-character-item"><p class="muted">Sin personajes registrados.</p></li>'}
-                </ul>
-              </div>
-            </article>
-          ` : ''}
           ${actor && state.actorDetailsExpanded && state.actorRenameModalOpen ? `
             <section id="actorRenameModal" class="detail-modal actor-rename-modal" role="dialog" aria-modal="true" aria-labelledby="actorRenameTitle">
               <article class="detail-content mock-box actor-rename-panel" data-actor-rename-panel>
@@ -7122,6 +7222,17 @@
       `;
 
       // Form Toggle
+      viewActores.querySelectorAll('[data-actor-letter]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const next = btn.dataset.actorLetter || 'top';
+          if (state.actorLetterFilter === next) return;
+          state.actorLetterFilter = next;
+          state.actorFocus = null;
+          state.actorDetailsExpanded = false;
+          renderActoresView();
+        });
+      });
+
       const toggleBtn = document.getElementById('toggleActorFormBtn');
       const actorForm = document.getElementById('addActorForm');
       toggleBtn?.addEventListener('click', () => {
@@ -7160,6 +7271,7 @@
         saveVideos();
         refreshDependentViews();
         state.actorFocus = actorName;
+        state.actorLetterFilter = getActorInitialLetter(actorName);
         state.actorDetailsExpanded = true;
         renderActoresView();
       });
@@ -7228,6 +7340,7 @@
               delete state.blockedCharactersByActor[actor];
           }
           state.actorFocus = cleanName;
+          state.actorLetterFilter = getActorInitialLetter(cleanName);
           state.actorRenameModalOpen = false;
           saveBlockedCharacters();
           saveVideos();
@@ -7286,6 +7399,7 @@
             state.actorDetailsExpanded = false;
           } else {
             state.actorFocus = clickedActor;
+            state.actorLetterFilter = getActorInitialLetter(clickedActor);
             state.actorDetailsExpanded = true;
           }
           renderActoresView();
