@@ -3691,6 +3691,13 @@
               <span class="sidebar-hint">Talentos de voz</span>
             </span>
           </button>
+          <button id="navMaraton" class="sidebar-item">
+            <span class="sidebar-item-icon" aria-hidden="true">🏃‍♂️</span>
+            <span class="sidebar-item-text">
+              <span class="sidebar-label">MARATÓN</span>
+              <span class="sidebar-hint">Playlist galáctica</span>
+            </span>
+          </button>
           <button id="navIndice" class="sidebar-item">
             <span class="sidebar-item-icon" aria-hidden="true">📚</span>
             <span class="sidebar-item-text">
@@ -3796,6 +3803,7 @@
     const navUniverses = document.getElementById('navUniverses');
     const navIndice = document.getElementById('navIndice');
     const navActores = document.getElementById('navActores');
+    const navMaraton = document.getElementById('navMaraton');
     const viewInicio = document.getElementById('viewInicio');
     const viewMap = document.getElementById('viewMap');
     const viewUniverse = document.getElementById('viewUniverse');
@@ -7591,7 +7599,8 @@
         universe: navUniverses,
         characterProfile: navIndice,
         indice: navIndice,
-        actores: navActores
+        actores: navActores,
+        maraton: navMaraton
       };
       activeNavByView[next]?.classList.add('active');
 
@@ -7622,6 +7631,7 @@
     navUniverses.onclick = () => changeView(state.universe ? 'universe' : 'map');
     navIndice.onclick = () => changeView('indice');
     navActores.onclick = () => changeView('actores');
+    navMaraton.onclick = () => changeView('maraton');
 
     state.universeNodes = loadUniverseNodesFromStorage();
     loadVideosFromStorage();
