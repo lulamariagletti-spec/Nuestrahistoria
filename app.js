@@ -2860,9 +2860,10 @@
       if (!parentNode) return [];
       const byChildName = new Map();
       const universeMap = groupByUniverse();
-      Object.entries(state.universeMemberships || {}).forEach(([childId, parentId]) => {
-        if (parentId !== parentNode.id) return;
-        const childNode = state.universeNodes.find((node) => node.id === childId);
+      state.universeNodes.forEach((childNode) => {
+        if (!childNode || childNode.id === parentNode.id) return;
+        const parentIds = getParentUniverseIdsForNode(childNode);
+        if (!parentIds.includes(parentNode.id)) return;
         if (!childNode?.name) return;
         const childName = String(childNode.name).trim();
         if (!childName) return;
@@ -3322,14 +3323,23 @@
       };
 
       const renderMapWorldContent = () => {
+        const formatCoverUrlLabel = (cover) => {
+          const trimmedCover = String(cover || '').trim();
+          if (!trimmedCover) return 'Sin URL';
+          if (/^https?:\/\//i.test(trimmedCover)) {
+            return trimmedCover.length > 52 ? `${trimmedCover.slice(0, 49)}...` : trimmedCover;
+          }
+          return 'Imagen local';
+        };
         const universes = groupByUniverse();
         ensureUniverseNodes();
         syncFavoriteUniverseSetFromNodes();
         const worldNodes = [];
         const worldLinks = [];
-        const childUniverseIds = new Set(Object.keys(state.universeMemberships || {}));
-        const rootUniverseNodes = state.universeNodes.filter((node) => !childUniverseIds.has(node.id) || node.isFavorite === true);
-        const rootUniverseNodeIds = new Set(rootUniverseNodes.map((node) => node.id));
+        const rootUniverseNodes = state.universeNodes.filter((node) => {
+          const hasParents = getParentUniverseIdsForNode(node).length > 0;
+          return !hasParents || node.isFavorite === true;
+        });
         const absorptionEffect = state.mapAbsorptionEffect;
         const absorptionMarkup = absorptionEffect
           ? `
@@ -3429,6 +3439,7 @@
                   </div>
                   <div class="node-info">
                     <h3>${safeWorldName}</h3>
+                    <p class="node-cover-url" title="${escapeHtml(String(entry.cover || '').trim() || 'Sin URL')}">${escapeHtml(formatCoverUrlLabel(entry.cover))}</p>
                   </div>
                 </button>
               `);
@@ -3445,6 +3456,7 @@
               </div>
               <div class="node-info">
                 <h3>${safeName}</h3>
+                <p class="node-cover-url" title="${escapeHtml(String(node.cover || '').trim() || 'Sin URL')}">${escapeHtml(formatCoverUrlLabel(node.cover))}</p>
               </div>
             </button>
           `;

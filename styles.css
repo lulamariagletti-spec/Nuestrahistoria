@@ -910,6 +910,20 @@
       text-transform: uppercase;
     }
 
+    .universe-node .node-cover-url {
+      margin-top: 6px;
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: rgba(206, 231, 255, 0.95);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      display: block;
+    }
+
     .completion-badge {
       display: inline-flex;
       align-items: center;
