@@ -6351,6 +6351,10 @@
         if (rankDiff !== 0) return rankDiff;
         return groupA.localeCompare(groupB, 'es', { sensitivity: 'base' });
       });
+      const visibleRoleGroupKeys = new Set(sortedRoleGroups.map(([groupKey]) => groupKey));
+      state.indiceCollapsedRoleGroups = new Set(
+        [...state.indiceCollapsedRoleGroups].filter((groupKey) => visibleRoleGroupKeys.has(groupKey))
+      );
       viewIndice.innerHTML = `
         <section class="mock-shell">
           <div class="indice-toolbar">
@@ -6488,6 +6492,26 @@
       if (state.showAddCharacterForm) {
         initializeCompactMultiSelects(viewIndice);
       }
+      document.getElementById('expandAllRoleGroupsBtn')?.addEventListener('click', () => {
+        state.indiceCollapsedRoleGroups.clear();
+        renderIndiceView();
+      });
+      document.getElementById('collapseAllRoleGroupsBtn')?.addEventListener('click', () => {
+        state.indiceCollapsedRoleGroups = new Set(sortedRoleGroups.map(([groupKey]) => groupKey));
+        renderIndiceView();
+      });
+      viewIndice.querySelectorAll('[data-toggle-role-group]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const groupKey = String(btn.dataset.toggleRoleGroup || '').trim();
+          if (!groupKey) return;
+          if (state.indiceCollapsedRoleGroups.has(groupKey)) {
+            state.indiceCollapsedRoleGroups.delete(groupKey);
+          } else {
+            state.indiceCollapsedRoleGroups.add(groupKey);
+          }
+          renderIndiceView();
+        });
+      });
       viewIndice.querySelectorAll('[data-open-character]').forEach((btn) => {
         btn.addEventListener('click', () => {
           state.indiceCharacterFocus = btn.dataset.openCharacter;
