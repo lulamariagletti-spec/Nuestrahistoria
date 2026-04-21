@@ -2906,19 +2906,9 @@
       return entries.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
     }
 
-    function hasFavoriteDirectChildWorld(parentNodeId) {
-      const normalizedParentId = String(parentNodeId || '').trim();
-      if (!normalizedParentId) return false;
-      return Object.entries(state.universeMemberships || {}).some(([childId, parentId]) => {
-        if (String(parentId || '').trim() !== normalizedParentId) return false;
-        const childNode = state.universeNodes.find((node) => node.id === childId);
-        return Boolean(childNode?.isFavorite);
-      });
-    }
-
     function isUniverseExpandedOnMap(universeNode) {
       if (!universeNode?.id) return false;
-      return state.expandedUniverses.has(universeNode.id) || hasFavoriteDirectChildWorld(universeNode.id);
+      return state.expandedUniverses.has(universeNode.id);
     }
 
     function getConnectorVariant(seedKey) {
@@ -3803,7 +3793,9 @@
           }
           event.stopPropagation();
           const clickedNodeId = nodeEl.dataset.nodeId || '';
-          if (state.expandedUniverses.has(clickedNodeId)) {
+          if (!clickedNodeId) return;
+          const isExpanded = state.expandedUniverses.has(clickedNodeId);
+          if (isExpanded) {
             state.expandedUniverses.delete(clickedNodeId);
           } else {
             state.expandedUniverses.add(clickedNodeId);
