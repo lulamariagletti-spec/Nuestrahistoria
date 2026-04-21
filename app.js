@@ -2858,9 +2858,9 @@
     function getUniverseChildWorldEntries(universeName) {
       const parentNode = state.universeNodes.find((node) => normalizeUniverseName(node.name) === normalizeUniverseName(universeName));
       if (!parentNode) return [];
-      const byChildName = new Map();
+      const byChildId = new Map();
       const universeMap = groupByUniverse();
-      state.universeNodes.forEach((childNode) => {
+      state.universeNodes.forEach((childNode, childIndex) => {
         if (!childNode || childNode.id === parentNode.id) return;
         const parentIds = getParentUniverseIdsForNode(childNode);
         if (!parentIds.includes(parentNode.id)) return;
@@ -2869,8 +2869,9 @@
         if (!childName) return;
         const childKey = normalizeUniverseName(childName);
         const childUniverseData = universeMap[childKey] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
-        if (!byChildName.has(childKey)) {
-          byChildName.set(childKey, {
+        const childUniqueKey = String(childNode.id || '').trim() || `child-node:${childKey}:${childIndex}`;
+        if (!byChildId.has(childUniqueKey)) {
+          byChildId.set(childUniqueKey, {
             id: childNode.id,
             name: childName,
             cover: childNode.cover || '',
@@ -2879,7 +2880,7 @@
           });
         }
       });
-      return [...byChildName.values()].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+      return [...byChildId.values()].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
     }
 
     function getUniverseWorldEntries(universeName) {
@@ -3355,7 +3356,10 @@
           const isExpanded = isUniverseExpandedOnMap(node);
           if (isExpanded) {
             const entries = getUniverseWorldEntries(node.name)
-              .map((entry) => ({ ...entry, type: 'universe-child', worldKey: `universe-child:${entry.id || normalizeUniverseName(entry.name)}` }));
+              .map((entry, entryIndex) => {
+                const baseWorldKey = String(entry.id || '').trim() || `${normalizeUniverseName(entry.name)}:${entryIndex}`;
+                return { ...entry, type: 'universe-child', worldKey: `universe-child:${baseWorldKey}` };
+              });
             const worldCount = entries.length;
             const orbitRadius = getWorldOrbitRadius(worldCount);
             const startAngle = ((Math.abs(hashCode(`${node.id}-${worldCount}`)) % 360) * Math.PI) / 180;
@@ -3366,7 +3370,7 @@
               const safeX = Math.round(worldX - WORLD_NODE_HALF_WIDTH);
               const safeY = Math.round(worldY - WORLD_NODE_HALF_HEIGHT);
               const safeWorldName = escapeHtml(entry.name);
-              const worldNodeId = entry.id || state.universeNodes.find((item) => normalizeUniverseName(item.name) === normalizeUniverseName(entry.name))?.id || '';
+              const worldNodeId = entry.id || '';
               const floatDelay = ((Math.abs(hashCode(`${entry.id || entry.name}-${index}`)) % 24) / 10).toFixed(1);
               const worldCenterX = worldX;
               const worldCenterY = worldY;
